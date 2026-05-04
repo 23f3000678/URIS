@@ -32,7 +32,7 @@ export default function Tasks() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filter, setFilter]   = useState<'all' | 'stale' | 'blocked'>('all')
   const [showCreate, setShowCreate] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', internId: '', complexity: '0.5', status: 'backlog', planeTaskId: '' })
+  const [newTask, setNewTask] = useState({ title: '', internId: '', complexity: '3', status: 'backlog', planeTaskId: '' })
   const [creating, setCreating]   = useState(false)
   const [createError, setCreateError] = useState('')
   const isAdmin = useAuthStore(s => s.isAdmin())
@@ -64,11 +64,11 @@ export default function Tasks() {
     setCreateError('')
     try {
       const complexity = parseFloat(newTask.complexity)
-      if (complexity < 0 || complexity > 1) throw new Error('Complexity must be between 0 and 1')
+      if (!Number.isInteger(complexity) || complexity < 1 || complexity > 5) throw new Error('Complexity must be an integer between 1 and 5')
       if (!newTask.internId) throw new Error('Please select an intern')
       await createTask({ ...newTask, complexity })
       setShowCreate(false)
-      setNewTask({ title: '', internId: '', complexity: '0.5', status: 'backlog', planeTaskId: '' })
+      setNewTask({ title: '', internId: '', complexity: '3', status: 'backlog', planeTaskId: '' })
       await fetchData()
     } catch (err: unknown) {
       setCreateError(extractErrorMessage(err, 'Failed to create task.'))
@@ -311,13 +311,15 @@ export default function Tasks() {
                   </select>
                 </div>
                 <div>
-                  <label className="nav-label text-[0.6rem] text-gold/60 block mb-2">COMPLEXITY (0–1)</label>
-                  <input type="number" min="0" max="1" step="0.1" className="uris-input"
+                  <label className="nav-label text-[0.6rem] text-gold/60 block mb-2">COMPLEXITY (1–5)</label>
+                  <input type="number" min="1" max="5" step="1" className="uris-input"
                     value={newTask.complexity} onChange={e => setNewTask(f => ({ ...f, complexity: e.target.value }))} required />
                 </div>
                 <div>
-                  <label className="nav-label text-[0.6rem] text-gold/60 block mb-2">PLANE TASK ID (optional)</label>
-                  <input className="uris-input" placeholder="plane-task-123"
+                  <label className="nav-label text-[0.6rem] text-gold/60 block mb-2">
+                    PLANE TASK ID <span className="text-ice/25">(OPTIONAL — LEAVE BLANK IF NOT USING PLANE)</span>
+                  </label>
+                  <input className="uris-input" placeholder="e.g. plane-task-123 — auto-generated if blank"
                     value={newTask.planeTaskId} onChange={e => setNewTask(f => ({ ...f, planeTaskId: e.target.value }))} />
                 </div>
                 {createError && (

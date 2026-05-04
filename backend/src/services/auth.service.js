@@ -15,7 +15,7 @@ if (!process.env.JWT_SECRET) {
 
 // ── Register ──────────────────────────────────────────────────────────────────
 
-async function register({ email, password, role }) {
+async function register({ name, email, password, role }) {
   const prismaRole = normalizeRole(role ?? 'intern');
   if (!prismaRole) {
     const err = new Error(`Invalid role "${role}". Accepted values: intern, admin.`);
@@ -32,23 +32,37 @@ async function register({ email, password, role }) {
 
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+  // Admin registrations start as 'pending' — an existing admin must approve them.
+  // Intern registrations are immediately 'active'.
+  const status = prismaRole === 'ADMIN' ? 'pending' : 'active';
+
+  // Derive a display name: use the provided name if non-empty, otherwise fall
+  // back to the email prefix so existing behaviour is preserved.
+  const displayName = (typeof name === 'string' && name.trim())
+    ? name.trim()
+    : email.split('@')[0];
+
   const user = await prisma.user.create({
-    data: { email, password: hashedPassword, role: prismaRole },
-    select: { id: true, email: true, role: true, createdAt: true },
+    data: { email, password: hashedPassword, name: displayName, role: prismaRole, status },
+    select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
   });
+
+  void logAction(user.id, AUDIT_ACTIONS.REGISTER, AUDIT_ENTITIES.USER, user.id, {
+    email:  user.email,
+    role:   user.role,
+    status: user.status,
+  });
+
+  // Pending admin accounts: return no token — they cannot log in until approved.
+  if (status === 'pending') {
+    return { pending: true, user: { email: user.email, role: user.role.toLowerCase() } };
+  }
 
   // Auto-create an Intern record for intern-role users so all intern-scoped
   // queries (dashboard, tasks, availability, alerts) work immediately after registration.
   if (prismaRole === 'INTERN') {
-    await prisma.intern.create({
-      data: { userId: user.id },
-    });
+    await prisma.intern.create({ data: { userId: user.id } });
   }
-
-  void logAction(user.id, AUDIT_ACTIONS.REGISTER, AUDIT_ENTITIES.USER, user.id, {
-    email: user.email,
-    role:  user.role,
-  });
 
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
@@ -60,7 +74,7 @@ async function register({ email, password, role }) {
     token,
     user: {
       id:    user.id,
-      name:  user.email.split('@')[0],
+      name:  user.name,
       email: user.email,
       role:  user.role.toLowerCase(),
     },
@@ -80,6 +94,13 @@ async function login({ email, password }) {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw invalidErr;
 
+  // Block pending admin accounts from logging in until approved
+  if (user.status === 'pending') {
+    const pendingErr = new Error('Your admin account is pending approval. Please wait for an existing admin to approve your access.');
+    pendingErr.status = 403;
+    throw pendingErr;
+  }
+
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
     process.env.JWT_SECRET,
@@ -90,7 +111,7 @@ async function login({ email, password }) {
     token,
     user: {
       id:    user.id,
-      name:  user.email.split('@')[0],
+      name:  user.name || user.email.split('@')[0],  // fallback for legacy rows without a name
       email: user.email,
       role:  user.role.toLowerCase(),
     },

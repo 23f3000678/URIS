@@ -5,6 +5,8 @@ const prisma = require('../utils/prisma');
 async function getAlerts(req, res, next) {
   try {
     const { type, severity } = req.query;
+    const take = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const skip = parseInt(req.query.offset, 10) || 0;
 
     const where = { resolved: false };
     if (type)     where.type     = type;
@@ -13,6 +15,8 @@ async function getAlerts(req, res, next) {
     const alerts = await prisma.alert.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
 
     return ok(res, alerts, `${alerts.length} active alert(s).`);

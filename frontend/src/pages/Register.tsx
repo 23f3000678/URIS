@@ -11,6 +11,7 @@ export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'intern' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingApproval, setPendingApproval] = useState(false)
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
 
@@ -22,14 +23,54 @@ export default function Register() {
     setError('')
     try {
       const res = await authAPI.register(form)
-      const { token, user } = res.data.data as { token: string; user: Parameters<typeof login>[1] }
-      login(token, user)
-      navigate(user.role === 'intern' ? '/availability' : '/dashboard')
+      const data = res.data.data as { pending?: boolean; token?: string; user: Parameters<typeof login>[1] }
+
+      if (data.pending) {
+        // Admin registration — awaiting approval, no token issued
+        setPendingApproval(true)
+        return
+      }
+
+      login(data.token!, data.user)
+      navigate(data.user.role === 'intern' ? '/availability' : '/dashboard')
     } catch (err: unknown) {
       setError(extractErrorMessage(err, 'Registration failed. Please try again.'))
     } finally {
       setLoading(false)
     }
+  }
+
+  if (pendingApproval) {
+    return (
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 relative overflow-hidden">
+        <Starfield />
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 w-full max-w-md">
+          <div className="glass-card rounded-sm p-10 text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300, delay: 0.1 }}
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
+              style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.3)' }}>
+              <Diamond size={24} className="text-gold" />
+            </motion.div>
+            <h2 className="font-display font-black text-2xl text-ice-gradient mb-3">Access Requested</h2>
+            <div className="gold-rule w-16 mx-auto mb-4" />
+            <p className="font-body text-sm text-ice/50 mb-2">
+              Your admin account has been created and is pending approval.
+            </p>
+            <p className="font-body text-sm text-ice/40 mb-8">
+              An existing admin will review your request. You'll be able to log in once approved.
+            </p>
+            <Link to="/login">
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                className="btn-outline px-8 py-3 rounded-sm text-sm">
+                BACK TO LOGIN
+              </motion.button>
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    )
   }
 
   return (

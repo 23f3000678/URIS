@@ -1,22 +1,39 @@
-const axios = require('axios');
-const prisma = require('../utils/prisma');
+const axios      = require('axios');
+const axiosRetry = require('axios-retry').default;
+const prisma     = require('../utils/prisma');
+const logger     = require('../utils/logger');
+
+// ── Nextcloud HTTP client ─────────────────────────────────────────────────────
+// Dedicated axios instance with:
+//   - 15 s timeout (WebDAV PUT can be slow for large payloads)
+//   - 2 retries with exponential backoff on network errors and 5xx only
+//   - No retry on 401/403 — auth failures won't self-heal
+const axiosNextcloud = axios.create({
+  timeout: parseInt(process.env.NEXTCLOUD_REQUEST_TIMEOUT_MS) || 15_000,
+});
+
+axiosRetry(axiosNextcloud, {
+  retries:        2,
+  retryDelay:     axiosRetry.exponentialDelay,   // 1 s, 2 s
+  retryCondition: (err) => {
+    const status = err.response?.status;
+    // Never retry auth failures — they won't self-heal
+    if (status === 401 || status === 403) return false;
+    return axiosRetry.isNetworkError(err) || axiosRetry.isRetryableError(err);
+  },
+  onRetry: (retryCount, err) => {
+    logger.warn({ retryCount, status: err.response?.status, message: err.message }, 'Nextcloud upload retry');
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Nextcloud WebDAV provider
 // ---------------------------------------------------------------------------
 
-async function _attemptUpload(url, authHeader, data) {
-  await axios.put(url, JSON.stringify(data), {
-    headers: {
-      'Authorization': authHeader,
-      'Content-Type': 'application/json',
-    },
-  });
-}
-
 /**
  * Upload JSON data as a file to Nextcloud via WebDAV PUT.
- * Retries once on failure. Tracks result in SyncLog.
+ * Retries automatically via axiosNextcloud (2 retries, exponential backoff).
+ * Tracks result in SyncLog.
  *
  * @param {string}  filename
  * @param {Object}  data
@@ -24,76 +41,47 @@ async function _attemptUpload(url, authHeader, data) {
  * @returns {Promise<{ success: boolean, message?: string }>}
  */
 async function uploadToNextcloud(filename, data, internId = null) {
-  const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
+  const NEXTCLOUD_URL      = process.env.NEXTCLOUD_URL;
   const NEXTCLOUD_USERNAME = process.env.NEXTCLOUD_USERNAME;
   const NEXTCLOUD_PASSWORD = process.env.NEXTCLOUD_PASSWORD;
 
-  // Validate environment variables
   if (!NEXTCLOUD_URL || !NEXTCLOUD_USERNAME || !NEXTCLOUD_PASSWORD) {
     const message = 'Missing Nextcloud environment variables';
-    console.error('[ERROR] Nextcloud sync failed:', message);
+    logger.error({ filename }, 'Nextcloud sync failed — missing env vars');
     await _logSync(internId, filename, 'FAILED', message);
     return { success: false, message };
   }
 
-  // Ensure URL ends with '/' and construct full WebDAV path
-  // NEXTCLOUD_URL should already include: /remote.php/dav/files/{username}
-  const baseUrl = NEXTCLOUD_URL.endsWith('/') ? NEXTCLOUD_URL : `${NEXTCLOUD_URL}/`;
-  const url = `${baseUrl}${filename}`;
-  
-  // Create Basic Auth header manually
+  const baseUrl    = NEXTCLOUD_URL.endsWith('/') ? NEXTCLOUD_URL : `${NEXTCLOUD_URL}/`;
+  const url        = `${baseUrl}${filename}`;
   const authHeader = 'Basic ' + Buffer.from(`${NEXTCLOUD_USERNAME}:${NEXTCLOUD_PASSWORD}`).toString('base64');
 
-  // Debug logs
-  console.log('[Nextcloud] Username  :', NEXTCLOUD_USERNAME);
-  console.log('[Nextcloud] Upload URL:', url);
-  console.log('[Nextcloud] Filename  :', filename);
-
-  let lastError = null;
-
-  // Attempt upload — retry once on failure
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      await _attemptUpload(url, authHeader, data);
-
-      console.log('[INFO] Nextcloud sync success:', filename);
-      await _logSync(internId, filename, 'SUCCESS', null);
-      return { success: true };
-    } catch (err) {
-      lastError = err;
-      
-      // Log detailed error information
-      console.error(`[Nextcloud] Attempt ${attempt} failed:`, {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        message: err.message,
-        url: url
-      });
-
-      // Don't retry on 403 (permission denied) or 401 (unauthorized)
-      if (err.response?.status === 403 || err.response?.status === 401) {
-        break;
-      }
-      
-      if (attempt === 1) {
-        console.warn('[Nextcloud] Retrying upload...');
-      }
-    }
+  if (process.env.DEBUG === 'true') {
+    logger.debug({ username: NEXTCLOUD_USERNAME, url, filename }, 'Nextcloud upload debug info');
   }
 
-  // Determine error message based on status code
-  let message = 'Unknown error';
-  if (lastError?.response?.status === 403) {
-    message = 'Nextcloud permission denied (403 Forbidden)';
-  } else if (lastError?.response?.status === 401) {
-    message = 'Nextcloud authentication failed (401 Unauthorized)';
-  } else if (lastError?.message) {
-    message = lastError.message;
-  }
+  try {
+    await axiosNextcloud.put(url, JSON.stringify(data), {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type':  'application/json',
+      },
+    });
 
-  console.error('[ERROR] Nextcloud sync failed:', message);
-  await _logSync(internId, filename, 'FAILED', message);
-  return { success: false, message };
+    logger.info({ filename }, 'Nextcloud sync success');
+    await _logSync(internId, filename, 'SUCCESS', null);
+    return { success: true };
+  } catch (err) {
+    const status  = err.response?.status;
+    let   message = err.message ?? 'Unknown error';
+
+    if (status === 403) message = 'Nextcloud permission denied (403 Forbidden)';
+    else if (status === 401) message = 'Nextcloud authentication failed (401 Unauthorized)';
+
+    logger.error({ filename, status, message }, 'Nextcloud sync failed after retries');
+    await _logSync(internId, filename, 'FAILED', message);
+    return { success: false, message };
+  }
 }
 
 async function _logSync(internId, filename, status, error) {
@@ -107,7 +95,7 @@ async function _logSync(internId, filename, status, error) {
       } 
     });
   } catch (err) {
-    console.error('[SyncLog] Failed to write sync log:', err.message);
+    logger.error({ err, filename }, 'Failed to write sync log');
   }
 }
 

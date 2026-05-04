@@ -4,6 +4,8 @@ const { AUDIT_ACTIONS, AUDIT_ENTITIES } = require('../constants/auditActions');
 const { validateUpdateTaskStatus, isUUID } = require('../utils/validate');
 const { ok, validationError, notFound } = require('../utils/respond');
 const configStore = require('../services/configStore');
+const { getCapacityLabel } = require('../services/capacityEngine');
+const { getRpiWindowStart } = require('../services/performanceEngine');
 
 // Default deadline: Monday at 11:00 AM
 const DEFAULT_DEADLINE = { day: 1, hour: 11, minute: 0 }; // day: 0=Sun,1=Mon,...6=Sat
@@ -88,9 +90,13 @@ async function getAdminOverview(req, res, next) {
       prisma.intern.findMany({
         take:    10,
         include: {
-          user:        { select: { email: true } },
+          user:        { select: { email: true, name: true } },
           credibility: true,
-          reviews:     { select: { quality: true, timeliness: true, initiative: true } },
+          // Rolling window — only reviews within RPI_WINDOW_DAYS contribute to RPI
+          reviews: {
+            where:  { createdAt: { gte: getRpiWindowStart() } },
+            select: { quality: true, timeliness: true, initiative: true },
+          },
           tasks: {
             select: { status: true, complexity: true, progressPct: true },
           },
@@ -143,14 +149,11 @@ async function getAdminOverview(req, res, next) {
       const latestCapacity = i.scoreHistory[0];
       const capacityScore  = latestCapacity ? Math.round(latestCapacity.score) : 0;
 
-      // Derive the human-readable availability label from the numeric score.
-      // Mirrors the label thresholds in capacityEngine.js so the dashboard
-      // stays consistent without needing to store the label separately.
-      let availability;
-      if (!latestCapacity)        availability = 'No data';
-      else if (capacityScore >= 70) availability = 'High availability and low workload';
-      else if (capacityScore >= 40) availability = 'Moderate availability';
-      else                          availability = 'High workload or low availability';
+      // Derive the human-readable availability label from the single authoritative
+      // source in capacityEngine.js — thresholds stay in sync automatically.
+      const availability = latestCapacity
+        ? getCapacityLabel(capacityScore)
+        : 'No data';
 
       // Credibility score — CredibilityScore.score is a 0–1 float; multiply by
       // 100 to get the 0–100 integer the frontend expects.
@@ -160,7 +163,7 @@ async function getAdminOverview(req, res, next) {
 
       return {
         id:            i.id,
-        name:          i.user?.email?.split('@')[0] ?? i.id,
+        name:          i.user?.name || i.user?.email?.split('@')[0] || i.id,
         capacityScore,
         tli:           parseFloat(tli.toFixed(2)),
         rpi,
@@ -179,12 +182,51 @@ async function getAdminOverview(req, res, next) {
   }
 }
 
-function getAvailabilityDeadline(req, res) {
-  const deadline = configStore.get('availabilityDeadline', DEFAULT_DEADLINE);
-  return ok(res, deadline, 'Availability deadline fetched');
+async function getPendingUsers(req, res, next) {
+  try {
+    const users = await prisma.user.findMany({
+      where:   { status: 'pending' },
+      select:  { id: true, email: true, role: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return ok(res, users, 'Pending users fetched');
+  } catch (err) {
+    next(err);
+  }
 }
 
-function setAvailabilityDeadline(req, res) {
+async function approveUser(req, res, next) {
+  try {
+    const { userId } = req.body;
+    if (!userId) return validationError(res, 'userId is required');
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user)                    return notFound(res, 'User not found');
+    if (user.status !== 'pending') return validationError(res, 'User is not pending approval');
+
+    await prisma.user.update({ where: { id: userId }, data: { status: 'active' } });
+
+    void logAction(req.user?.id ?? null, 'APPROVE_USER', 'USER', userId, {
+      approvedEmail: user.email,
+      approvedRole:  user.role,
+    });
+
+    return ok(res, null, `User ${user.email} approved successfully`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getAvailabilityDeadline(req, res, next) {
+  try {
+    const deadline = await configStore.get('availabilityDeadline', DEFAULT_DEADLINE);
+    return ok(res, deadline, 'Availability deadline fetched');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function setAvailabilityDeadline(req, res, next) {
   const { day, hour, minute } = req.body;
 
   if (typeof day !== 'number' || day < 0 || day > 6) {
@@ -197,11 +239,15 @@ function setAvailabilityDeadline(req, res) {
     return validationError(res, 'minute must be an integer 0–59');
   }
 
-  configStore.set('availabilityDeadline', { day, hour, minute });
+  try {
+    await configStore.set('availabilityDeadline', { day, hour, minute });
 
-  void logAction(req.user?.id ?? null, 'SET_AVAILABILITY_DEADLINE', 'CONFIG', null, { day, hour, minute });
+    void logAction(req.user?.id ?? null, 'SET_AVAILABILITY_DEADLINE', 'CONFIG', null, { day, hour, minute });
 
-  return ok(res, { day, hour, minute }, 'Availability deadline updated');
+    return ok(res, { day, hour, minute }, 'Availability deadline updated');
+  } catch (err) {
+    next(err);
+  }
 }
 
-module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getAvailabilityDeadline, setAvailabilityDeadline };
+module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline };

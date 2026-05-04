@@ -13,6 +13,7 @@
  */
 
 const prisma = require('./prisma');
+const logger = require('./logger');
 
 async function trackActivity(userId, type, duration = null) {
   try {
@@ -24,9 +25,7 @@ async function trackActivity(userId, type, duration = null) {
       },
     });
   } catch (err) {
-    console.error('[ActivityTracker] Failed to write activity:', err.message, {
-      userId, type, duration,
-    });
+    logger.error({ err, userId, type, duration }, 'Failed to write activity');
   }
 }
 

@@ -1,6 +1,7 @@
 const { processInternCapacity } = require('../services/processInternCapacity');
 const { getAssignmentShortlist } = require('../services/assignmentEngine');
 const { MOCK_INTERNS } = require('../data/mockInterns');
+const logger = require('../utils/logger');
 
 async function runDemo(req, res) {
   try {
@@ -24,7 +25,7 @@ async function runDemo(req, res) {
       data: { availability, TLI, capacityScore, capacityLabel, rankedInterns },
     });
   } catch (err) {
-    console.error('[runDemo]', err);
+    logger.error({ err }, 'runDemo failed');
     return res.status(500).json({ success: false, message: 'Something went wrong while running the demo pipeline', data: null });
   }
 }

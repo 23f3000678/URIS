@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { detectAnomaly } = require('./anomalyDetector');
+const logger = require('../utils/logger');
 
 /**
  * Persist a score snapshot to history, then run anomaly detection.
@@ -12,12 +13,12 @@ const { detectAnomaly } = require('./anomalyDetector');
 async function saveScoreHistory(internId, score, type) {
   try {
     await prisma.scoreHistory.create({ data: { internId, score, type } });
-    console.log('[INFO] Score history recorded:', type);
+    logger.info({ internId, type }, 'Score history recorded');
 
     // Run anomaly detection after saving — fire-and-forget
     void detectAnomaly(internId, score, type);
   } catch (err) {
-    console.error('[scoreHistory] Failed to save score history:', err.message);
+    logger.error({ err, internId, type }, 'Failed to save score history');
   }
 }
 

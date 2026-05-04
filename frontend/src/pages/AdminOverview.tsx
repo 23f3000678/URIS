@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
 import { getAllTasks, type Task } from '../services/tasks.service'
-import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, type AvailabilityDeadline } from '../services/admin.service'
+import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, getPendingUsers, approveUser, type AvailabilityDeadline, type PendingUser } from '../services/admin.service'
 import { updateTaskStatus } from '../services/tasks.service'
 import { extractErrorMessage } from '../services/error'
 
@@ -24,7 +24,7 @@ export default function AdminOverview() {
   const [tasks, setTasks]         = useState<Task[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
-  const [activeTab, setActiveTab] = useState<'override' | 'assign' | 'status' | 'deadline'>('assign')
+  const [activeTab, setActiveTab] = useState<'override' | 'assign' | 'status' | 'deadline' | 'approvals'>('assign')
 
   // Override score form
   const [overrideInternId, setOverrideInternId] = useState('')
@@ -53,6 +53,11 @@ export default function AdminOverview() {
   const [deadlineLoading, setDeadlineLoading] = useState(false)
   const [deadlineMsg, setDeadlineMsg]       = useState<{ ok: boolean; text: string } | null>(null)
 
+  // Pending approvals
+  const [pendingUsers, setPendingUsers]         = useState<PendingUser[]>([])
+  const [approvingId, setApprovingId]           = useState<string | null>(null)
+  const [approvalMsg, setApprovalMsg]           = useState<{ ok: boolean; text: string } | null>(null)
+
   useEffect(() => {
     async function load(): Promise<void> {
       try {
@@ -77,6 +82,11 @@ export default function AdminOverview() {
         setDeadlineMinute(dl.minute)
       })
       .catch(() => {/* use defaults */})
+  }, [])
+
+  // Load pending users
+  useEffect(() => {
+    getPendingUsers().then(setPendingUsers).catch(() => {})
   }, [])
 
   const handleOverride = async (e: React.FormEvent) => {
@@ -142,11 +152,26 @@ export default function AdminOverview() {
     }
   }
 
+  const handleApprove = async (userId: string, email: string) => {
+    setApprovingId(userId)
+    setApprovalMsg(null)
+    try {
+      await approveUser(userId)
+      setPendingUsers(prev => prev.filter(u => u.id !== userId))
+      setApprovalMsg({ ok: true, text: `${email} approved and can now log in.` })
+    } catch (err: unknown) {
+      setApprovalMsg({ ok: false, text: extractErrorMessage(err, 'Approval failed.') })
+    } finally {
+      setApprovingId(null)
+    }
+  }
+
   const tabs = [
-    { key: 'assign',   label: 'ASSIGN TASK',    icon: UserCheck },
-    { key: 'override', label: 'SCORE OVERRIDE', icon: Shield },
-    { key: 'status',   label: 'UPDATE STATUS',  icon: TrendingUp },
-    { key: 'deadline', label: 'DEADLINE',        icon: Clock },
+    { key: 'assign',    label: 'ASSIGN TASK',    icon: UserCheck },
+    { key: 'override',  label: 'SCORE OVERRIDE', icon: Shield },
+    { key: 'status',    label: 'UPDATE STATUS',  icon: TrendingUp },
+    { key: 'deadline',  label: 'DEADLINE',        icon: Clock },
+    { key: 'approvals', label: 'APPROVALS',       icon: UserCheck, badge: pendingUsers.length },
   ] as const
 
   return (
@@ -295,10 +320,10 @@ export default function AdminOverview() {
                 transition={{ delay: 0.3 }} className="glass-card rounded-sm">
 
                 {/* Tabs */}
-                <div className="flex" style={{ borderBottom: '1px solid rgba(201,168,76,0.1)' }}>
+                <div className="flex flex-wrap" style={{ borderBottom: '1px solid rgba(201,168,76,0.1)' }}>
                   {tabs.map(t => (
                     <button key={t.key} onClick={() => setActiveTab(t.key)}
-                      className="flex-1 py-3 nav-label text-[0.55rem] transition-all duration-200 flex flex-col items-center gap-1"
+                      className="flex-1 py-3 nav-label text-[0.55rem] transition-all duration-200 flex flex-col items-center gap-1 relative"
                       style={{
                         background: activeTab === t.key ? 'rgba(201,168,76,0.08)' : 'transparent',
                         borderBottom: activeTab === t.key ? '2px solid #c9a84c' : '2px solid transparent',
@@ -306,6 +331,12 @@ export default function AdminOverview() {
                       }}>
                       <t.icon size={12} />
                       {t.label}
+                      {'badge' in t && t.badge > 0 && (
+                        <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center nav-label text-[0.45rem]"
+                          style={{ background: '#f87171', color: '#fff' }}>
+                          {t.badge}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -409,6 +440,55 @@ export default function AdminOverview() {
                         {statusMsg && <FeedbackBanner ok={statusMsg.ok} text={statusMsg.text} />}
                         <ActionButton loading={statusLoading} label="UPDATE STATUS" loadingLabel="UPDATING..." />
                       </motion.form>
+                    )}
+
+                    {/* PENDING APPROVALS */}
+                    {activeTab === 'approvals' && (
+                      <motion.div key="approvals" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }} className="space-y-4">
+                        <div className="mb-3">
+                          <p className="nav-label text-[0.55rem] text-gold/40">PENDING ADMIN APPROVALS</p>
+                          <p className="font-body text-xs text-ice/30 mt-1">
+                            Users who registered as admin and are awaiting access.
+                          </p>
+                        </div>
+
+                        {approvalMsg && <FeedbackBanner ok={approvalMsg.ok} text={approvalMsg.text} />}
+
+                        {pendingUsers.length === 0 ? (
+                          <div className="py-8 text-center">
+                            <Check size={20} className="text-signal mx-auto mb-2 opacity-40" />
+                            <p className="font-body text-sm text-ice/30">No pending approvals.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {pendingUsers.map(u => (
+                              <motion.div key={u.id}
+                                initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                                className="flex items-center justify-between p-3 rounded-sm"
+                                style={{ background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.15)' }}>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-body text-sm text-frost/80 truncate">{u.email}</p>
+                                  <p className="nav-label text-[0.5rem] text-gold/40 mt-0.5">
+                                    ADMIN · {new Date(u.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  </p>
+                                </div>
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                  disabled={approvingId === u.id}
+                                  onClick={() => handleApprove(u.id, u.email)}
+                                  className="ml-3 flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem] disabled:opacity-50 flex-shrink-0"
+                                  style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}>
+                                  {approvingId === u.id
+                                    ? <Loader2 size={11} className="animate-spin" />
+                                    : <Check size={11} />}
+                                  APPROVE
+                                </motion.button>
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
                     )}
 
                     {/* AVAILABILITY DEADLINE */}

@@ -21,6 +21,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 
 const DROP_THRESHOLD  = parseFloat(process.env.ANOMALY_DROP_THRESHOLD)  || 0.20;
 const SPIKE_THRESHOLD = parseFloat(process.env.ANOMALY_SPIKE_THRESHOLD) || 0.30;
@@ -93,10 +94,10 @@ async function detectAnomaly(internId, currentScore, scoreType) {
       data: { internId, type: alertType, severity, message },
     });
 
-    console.log(`[AnomalyDetector] ${severity.toUpperCase()} ${alertType} for intern ${internId} (${scoreType})`);
+    logger.info({ internId, alertType, severity, scoreType }, 'Anomaly alert created');
   } catch (err) {
     // Non-fatal — anomaly detection must never break the main flow
-    console.error('[AnomalyDetector] Error:', err.message);
+    logger.error({ err, internId, scoreType }, 'Anomaly detection failed');
   }
 }
 

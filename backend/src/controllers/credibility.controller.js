@@ -2,6 +2,7 @@ const { computeCredibilityScore } = require('../services/credibilityService');
 const { saveScoreHistory } = require('../services/scoreHistory.service');
 const { ok, validationError, notFound } = require('../utils/respond');
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 
 async function getCredibility(req, res) {
   const { internId } = req.query;
@@ -16,7 +17,7 @@ async function getCredibility(req, res) {
     await saveScoreHistory(internId, result.scoreOut100, 'credibility');
     return ok(res, result, 'Credibility score computed.');
   } catch (err) {
-    console.error('[credibilityController] getCredibility error:', err.message);
+    logger.error({ err }, 'getCredibility failed');
     return res.status(500).json({
       success: false,
       error:   'SERVER_ERROR',
@@ -34,7 +35,7 @@ async function getMyCredibility(req, res, next) {
     }
     const internId = intern.id;
 
-    console.log('[INFO] Credibility fetched for:', internId);
+    logger.info({ internId }, 'Credibility fetched');
 
     const result = await computeCredibilityScore(internId);
     // Save the 0–100 integer to score history for consistency with the capacity pipeline

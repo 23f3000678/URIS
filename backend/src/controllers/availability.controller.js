@@ -3,9 +3,9 @@ const { findAvailability } = require('../services/availability.service');
 const { processInternCapacity } = require('../services/processInternCapacity');
 const { computeCredibilityScore } = require('../services/credibilityService');
 const { uploadToNextcloud } = require('../services/storage.service');
-const { saveScoreHistory } = require('../services/scoreHistory.service');
 const { validateAvailabilitySubmission } = require('../services/businessRules');
 const { ok, validationError, businessError, notFound, forbidden, authError } = require('../utils/respond');
+const logger = require('../utils/logger');
 
 const VALID_WEEK_STATUSES = ['normal', 'busy', 'exam', 'free'];
 
@@ -62,7 +62,7 @@ async function submitAvailability(req, res, next) {
       const credResult = await computeCredibilityScore(internId);
       credibilityScore = credResult.scoreOut100; // 0–100 integer
     } catch (credErr) {
-      console.warn('[availability] Credibility fetch failed — using neutral default 50:', credErr.message);
+      logger.warn({ err: credErr, internId }, 'Credibility fetch failed — using neutral default 50');
     }
 
     const { availability, TLI, capacityScore, capacityLabel } = await processInternCapacity({
@@ -81,12 +81,64 @@ async function submitAvailability(req, res, next) {
         capacityScore,
         timestamp: new Date(),
       });
-      console.log('Nextcloud sync success: availability');
+      logger.info({ internId }, 'Nextcloud sync success: availability');
     } catch (uploadErr) {
-      console.error('Nextcloud sync failed:', uploadErr.message);
+      logger.error({ err: uploadErr }, 'Nextcloud sync failed: availability');
     }
 
-    await saveScoreHistory(internId, capacityScore, 'capacity');
+    // Score history + availability slot are written atomically in the
+    // transaction below — no separate saveScoreHistory call needed here.
+
+    // Persist the availability declaration to the AvailabilitySlot table.
+    // Both the score history write and the slot upsert are wrapped in a
+    // transaction so a partial write never leaves the DB in an inconsistent
+    // state (M-3 regression prevention).
+    //
+    // weekStart and weekEnd are derived from the current date when not supplied
+    // by the client (the frontend omits them). weekStart is always the Monday
+    // of the current week; weekEnd is exactly 7 days later.
+    const resolvedWeekStart = weekStart
+      ? new Date(weekStart)
+      : (() => {
+          const d = new Date();
+          d.setUTCHours(0, 0, 0, 0);
+          const day  = d.getUTCDay();
+          const diff = day === 0 ? -6 : 1 - day;
+          d.setUTCDate(d.getUTCDate() + diff);
+          return d;
+        })();
+
+    const resolvedWeekEnd = weekEnd
+      ? new Date(weekEnd)
+      : new Date(resolvedWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    try {
+      await prisma.$transaction([
+        prisma.scoreHistory.create({
+          data: { internId, score: capacityScore, type: 'capacity' },
+        }),
+        prisma.availabilitySlot.upsert({
+          where:  { internId_weekStart: { internId, weekStart: resolvedWeekStart } },
+          update: {
+            weekEnd:           resolvedWeekEnd,
+            busyBlocks:        busyBlocks ?? [],
+            maxFreeBlockHours: maxFreeBlockHours,
+          },
+          create: {
+            internId,
+            weekStart:         resolvedWeekStart,
+            weekEnd:           resolvedWeekEnd,
+            busyBlocks:        busyBlocks ?? [],
+            maxFreeBlockHours: maxFreeBlockHours,
+          },
+        }),
+      ]);
+    } catch (txErr) {
+      // Transaction failed — both writes rolled back atomically.
+      // Log and surface as a 500 so the client knows to retry.
+      logger.error({ err: txErr, internId }, 'Availability transaction failed — rolled back');
+      return next(txErr);
+    }
 
     return ok(res, { availability, TLI, capacityScore, capacityLabel }, 'Availability processed');
   } catch (err) {

@@ -11,6 +11,7 @@ const { AUDIT_ACTIONS, AUDIT_ENTITIES } = require('../constants/auditActions');
  */
 async function registerUser(req, res, next) {
   try {
+    const name     = typeof req.body.name     === 'string' ? req.body.name.trim() : '';
     const email    = typeof req.body.email    === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body.password === 'string' ? req.body.password : '';
     const role     = typeof req.body.role     === 'string' ? req.body.role.trim() : 'intern';
@@ -20,7 +21,7 @@ async function registerUser(req, res, next) {
       return validationError(res, errors[0]);
     }
 
-    const user = await register({ email, password, role });
+    const user = await register({ name, email, password, role });
 
     return created(res, user, 'Account created successfully.');
   } catch (err) {

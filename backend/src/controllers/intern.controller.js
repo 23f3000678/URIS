@@ -1,6 +1,7 @@
 const prisma = require('../utils/prisma');
 const { computePerformanceIndex } = require('../services/performanceEngine');
 const { ok, notFound } = require('../utils/respond');
+const logger = require('../utils/logger');
 
 async function getInternDashboard(req, res, next) {
   try {
@@ -23,7 +24,7 @@ async function getInternDashboard(req, res, next) {
     }
 
     const internId = intern.id;
-    console.log('[INFO] Intern dashboard fetched:', internId);
+    logger.info({ internId }, 'Intern dashboard fetched');
 
     const assignedTasks = await prisma.task.findMany({
       where:  { internId, status: 'active' },

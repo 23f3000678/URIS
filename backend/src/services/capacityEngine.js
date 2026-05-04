@@ -18,6 +18,8 @@
 
 'use strict';
 
+const logger = require('../utils/logger');
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 /**
@@ -82,13 +84,13 @@ function sanitizeInputs(params) {
 
   // Warn on each substitution so data issues are visible in logs
   if (safe.availabilityScore !== availabilityScore)
-    console.warn(`[capacityEngine] availabilityScore was ${availabilityScore} — using default ${DEFAULTS.availabilityScore}`);
+    logger.warn({ received: availabilityScore, default: DEFAULTS.availabilityScore }, 'availabilityScore invalid — using default');
   if (safe.tli !== tli)
-    console.warn(`[capacityEngine] tli was ${tli} — using default ${DEFAULTS.tli}`);
+    logger.warn({ received: tli, default: DEFAULTS.tli }, 'tli invalid — using default');
   if (safe.performanceIndex !== performanceIndex)
-    console.warn(`[capacityEngine] performanceIndex was ${performanceIndex} — using default ${DEFAULTS.performanceIndex}`);
+    logger.warn({ received: performanceIndex, default: DEFAULTS.performanceIndex }, 'performanceIndex invalid — using default');
   if (safe.credibilityScore !== credibilityScore)
-    console.warn(`[capacityEngine] credibilityScore was ${credibilityScore} — using default ${DEFAULTS.credibilityScore}`);
+    logger.warn({ received: credibilityScore, default: DEFAULTS.credibilityScore }, 'credibilityScore invalid — using default');
 
   return safe;
 }
@@ -194,32 +196,68 @@ function getCredibilityModifier(credibilityScore) {
   return -10;
 }
 
+/**
+ * Reservation Penalty — applied when an intern has an active soft reservation.
+ *
+ * When a task is assigned, `reservedUntil` is set on the Intern record for
+ * RESERVATION_HOURS hours. During this window the capacity engine applies a
+ * −20 penalty so the intern does not appear fully available to a second admin
+ * before Plane syncs the new task.
+ *
+ * @param {Date|null} reservedUntil - The reservation expiry timestamp, or null
+ * @returns {number} 0 (no active reservation) | 20 (active reservation)
+ */
+function getReservationPenalty(reservedUntil) {
+  if (!reservedUntil) return 0;
+  return new Date(reservedUntil) > new Date() ? 20 : 0;
+}
+
+// ── Label helper ──────────────────────────────────────────────────────────────
+
+/**
+ * Returns the human-readable capacity label for a given score.
+ * Exported so any module that stores or displays a capacity score can derive
+ * the label from a single authoritative source rather than duplicating the
+ * threshold logic.
+ *
+ * @param {number|null} capacityScore - Integer 0–100, or null when no score exists
+ * @returns {string}
+ */
+function getCapacityLabel(capacityScore) {
+  if (capacityScore === null || capacityScore === undefined) return 'No data';
+  if (capacityScore >= 70) return 'High availability and low workload';
+  if (capacityScore >= 40) return 'Moderate availability';
+  return 'High workload or low availability';
+}
+
 // ── Main function ─────────────────────────────────────────────────────────────
 
 /**
  * Calculates the CapacityScore by sanitising inputs then combining the five
  * component helpers.  Always returns a finite integer in [0, 100].
  *
- * @param {Object}  params
- * @param {number}  params.availabilityScore  - Pre-computed availability score, 0–40
- * @param {number}  params.tli                - Task Load Index (raw float)
- * @param {string}  [params.weekStatusToggle] - Normalised week status: 'exam' | 'busy' | 'free' | 'normal'
- * @param {boolean} [params.examFlag]         - Legacy boolean; used only when weekStatusToggle is absent
- * @param {number}  params.performanceIndex   - Weighted review average, 1–5 scale
- * @param {number}  params.credibilityScore   - 0–100 integer
+ * @param {Object}    params
+ * @param {number}    params.availabilityScore  - Pre-computed availability score, 0–40
+ * @param {number}    params.tli                - Task Load Index (raw float)
+ * @param {string}    [params.weekStatusToggle] - Normalised week status: 'exam' | 'busy' | 'free' | 'normal'
+ * @param {boolean}   [params.examFlag]         - Legacy boolean; used only when weekStatusToggle is absent
+ * @param {number}    params.performanceIndex   - Weighted review average, 1–5 scale
+ * @param {number}    params.credibilityScore   - 0–100 integer
+ * @param {Date|null} [params.reservedUntil]    - Active soft reservation expiry (optional)
  * @returns {{ capacityScore: number, capacityLabel: string }}
  */
 function calculateCapacityScore(params) {
   // Sanitise all inputs — replace missing/NaN values with safe defaults
   const safe = sanitizeInputs(params);
 
-  const availability = getAvailabilityScore(safe.availabilityScore);
-  const taskPenalty  = getTaskLoadPenalty(safe.tli);
-  const examPenalty  = getExamPenalty(safe.weekStatusToggle, safe.examFlag);
-  const perfModifier = getPerformanceModifier(safe.performanceIndex);
-  const credModifier = getCredibilityModifier(safe.credibilityScore);
+  const availability      = getAvailabilityScore(safe.availabilityScore);
+  const taskPenalty       = getTaskLoadPenalty(safe.tli);
+  const examPenalty       = getExamPenalty(safe.weekStatusToggle, safe.examFlag);
+  const perfModifier      = getPerformanceModifier(safe.performanceIndex);
+  const credModifier      = getCredibilityModifier(safe.credibilityScore);
+  const reservationPenalty = getReservationPenalty(params?.reservedUntil ?? null);
 
-  const raw = availability - taskPenalty - examPenalty + perfModifier + credModifier;
+  const raw = availability - taskPenalty - examPenalty + perfModifier + credModifier - reservationPenalty;
 
   // Final NaN guard — should never trigger after sanitisation, but belt-and-braces
   const safeRaw = Number.isFinite(raw) ? raw : 0;
@@ -227,24 +265,18 @@ function calculateCapacityScore(params) {
   // Clamp to [0, 100] and return as integer
   const capacityScore = Math.round(Math.min(100, Math.max(0, safeRaw)));
 
-  // Human-readable label
-  let capacityLabel;
-  if (capacityScore >= 70)      capacityLabel = 'High availability and low workload';
-  else if (capacityScore >= 40) capacityLabel = 'Moderate availability';
-  else                          capacityLabel = 'High workload or low availability';
-
-  return { capacityScore, capacityLabel };
+  return { capacityScore, capacityLabel: getCapacityLabel(capacityScore) };
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
-  // Main entry point (used by processInternCapacity)
   calculateCapacityScore,
-  // Individual helpers (exported for unit testing)
+  getCapacityLabel,
   getAvailabilityScore,
   getTaskLoadPenalty,
   getExamPenalty,
   getPerformanceModifier,
   getCredibilityModifier,
+  getReservationPenalty,
 };

@@ -1,8 +1,9 @@
 const prisma = require('../utils/prisma');
-const { computePerformanceIndex } = require('../services/performanceEngine');
+const { computePerformanceIndex, getRpiWindowStart, RPI_WINDOW_DAYS } = require('../services/performanceEngine');
 const { uploadToNextcloud } = require('../services/storage.service');
 const { saveScoreHistory } = require('../services/scoreHistory.service');
 const { ok, notFound, forbidden } = require('../utils/respond');
+const logger = require('../utils/logger');
 
 async function getPerformance(req, res, next) {
   try {
@@ -26,7 +27,13 @@ async function getPerformance(req, res, next) {
       internId = intern.id;
     }
 
-    const reviews = await prisma.review.findMany({ where: { internId } });
+    // Rolling window — only reviews within RPI_WINDOW_DAYS are used
+    const reviews = await prisma.review.findMany({
+      where: {
+        internId,
+        createdAt: { gte: getRpiWindowStart() },
+      },
+    });
     const { performanceIndex: computedIndex, totalReviews: reviewCount } = computePerformanceIndex(reviews);
 
     // Respect admin override if set — use parsed integer for the lookup
@@ -54,14 +61,14 @@ async function getPerformance(req, res, next) {
         source,
         timestamp: new Date(),
       });
-      console.log('Nextcloud sync success: performance');
+      logger.info({ internId }, 'Nextcloud sync success: performance');
     } catch (uploadErr) {
-      console.error('Nextcloud sync failed:', uploadErr.message);
+      logger.error({ err: uploadErr, internId }, 'Nextcloud sync failed: performance');
     }
 
     await saveScoreHistory(internId, performanceIndex, 'performance');
 
-    return ok(res, { performanceIndex, reviewCount, isOverridden, source }, 'Performance retrieved');
+    return ok(res, { performanceIndex, reviewCount, isOverridden, source, windowDays: RPI_WINDOW_DAYS }, 'Performance retrieved');
   } catch (err) {
     next(err);
   }

@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 /**
  * Compute Task Load Index (TLI).
  *
@@ -29,7 +31,7 @@ function computeTaskLoadIndex(tasks) {
     return sum + safeTLI;
   }, 0);
 
-  console.log('[INFO] TLI computed:', total);
+  logger.debug({ tli: total, taskCount: tasksList.length }, 'TLI computed');
   return total;
 }
 

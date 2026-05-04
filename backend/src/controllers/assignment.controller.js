@@ -4,8 +4,14 @@ const { ok, validationError, businessError } = require('../utils/respond');
 const prisma = require('../utils/prisma');
 const { logAction } = require('../utils/auditLogger');
 const { AUDIT_ACTIONS, AUDIT_ENTITIES } = require('../constants/auditActions');
+const logger = require('../utils/logger');
 
 const MIN_CAPACITY_THRESHOLD = parseInt(process.env.MIN_CAPACITY_THRESHOLD) || 40;
+
+// Soft reservation window — how long after assignment the capacity engine
+// applies a −20 penalty before Plane sync confirms the task is active.
+// Configurable via RESERVATION_HOURS (default: 48 hours).
+const RESERVATION_HOURS = parseInt(process.env.RESERVATION_HOURS) || 48;
 
 async function getShortlist(req, res, next) {
   try {
@@ -19,7 +25,6 @@ async function getShortlist(req, res, next) {
       include: {
         credibility: true,
         tasks:       { where: { status: 'active' } },
-        // Fetch the most recent capacity score from the new pipeline
         scoreHistory: {
           where:   { type: 'capacity' },
           orderBy: { createdAt: 'desc' },
@@ -28,24 +33,24 @@ async function getShortlist(req, res, next) {
       },
     });
 
-    // Map DB records to the shape assignmentEngine expects.
-    // capacityScore and credibilityScore must both be 0–100 integers.
+    const now = new Date();
+
     const interns = dbInterns.map(i => {
-      // Latest capacity score from ScoreHistory (integer 0–100)
       const capacityScore = i.scoreHistory[0]
         ? Math.round(i.scoreHistory[0].score)
         : 0;
 
-      // CredibilityScore.score is a 0–1 float — convert to 0–100
       const credibilityScore = i.credibility
         ? Math.round(i.credibility.score * 100)
         : 0;
 
-      // Task Load Index — sum of (complexity × remaining work) for active tasks
       const TLI = i.tasks.reduce(
         (sum, t) => sum + t.complexity * (1 - t.progressPct / 100),
         0
       );
+
+      // Surface active reservation so the frontend can show "recently assigned"
+      const isReserved = i.reservedUntil ? new Date(i.reservedUntil) > now : false;
 
       return {
         id:                 i.id,
@@ -54,6 +59,8 @@ async function getShortlist(req, res, next) {
         TLI:                parseFloat(TLI.toFixed(2)),
         availabilityStatus: capacityScore >= 30 ? 'available' : 'unavailable',
         skillTags:          i.tasks.flatMap(t => t.skills ?? []),
+        isReserved,
+        reservedUntil:      isReserved ? i.reservedUntil : null,
       };
     });
 
@@ -96,7 +103,7 @@ async function assignTask(req, res, next) {
     const capacityScore = Math.round(latestCapacity.score);
 
     if (capacityScore < MIN_CAPACITY_THRESHOLD) {
-      console.log('[INFO] Assignment blocked (low capacity):', internId);
+      logger.info({ internId, capacityScore, threshold: MIN_CAPACITY_THRESHOLD }, 'Assignment blocked — low capacity');
       return res.status(400).json({
         success: false,
         message: `Intern not eligible for assignment — capacity score ${capacityScore} is below threshold ${MIN_CAPACITY_THRESHOLD}.`,
@@ -104,12 +111,22 @@ async function assignTask(req, res, next) {
       });
     }
 
-    await prisma.task.update({
-      where: { id: taskId },
-      data:  { internId },
-    });
+    await prisma.$transaction([
+      // Update the task's assigned intern
+      prisma.task.update({
+        where: { id: taskId },
+        data:  { internId },
+      }),
+      // Set a soft reservation on the intern so the capacity engine applies
+      // a −20 penalty for RESERVATION_HOURS, preventing a second admin from
+      // assigning another task before Plane syncs the first one.
+      prisma.intern.update({
+        where: { id: internId },
+        data:  { reservedUntil: new Date(Date.now() + RESERVATION_HOURS * 60 * 60 * 1000) },
+      }),
+    ]);
 
-    console.log('[INFO] Task assigned:', taskId, '→', internId);
+    logger.info({ taskId, internId, reservationHours: RESERVATION_HOURS }, 'Task assigned with soft reservation');
 
     void logAction(req.user?.id ?? null, AUDIT_ACTIONS.ASSIGN_TASK, AUDIT_ENTITIES.TASK, taskId, {
       taskId,

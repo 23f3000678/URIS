@@ -1,9 +1,10 @@
 const { computeAvailabilityIntelligence } = require('./availabilityIntelligence');
 const { computeTaskLoadIndex } = require('./taskLoadIndex');
 const { calculateCapacityScore } = require('./capacityEngine');
-const { computePerformanceIndex } = require('./performanceEngine');
+const { computePerformanceIndex, getRpiWindowStart } = require('./performanceEngine');
 const { computeCredibilityScore } = require('./credibilityService');
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 
 const DEFAULT_PERFORMANCE_INDEX  = 3;  // neutral fallback when no reviews exist
 const DEFAULT_CREDIBILITY_SCORE  = 50; // neutral fallback (0–100) when credibility unavailable
@@ -36,12 +37,17 @@ async function processInternCapacity({
     const busyBlocksList = busyBlocks || [];
     const tasksList      = tasks      || [];
 
-    // ── Performance index ────────────────────────────────────────────────────
-    // Fetch from DB when internId is available; use caller-supplied value or
-    // neutral default otherwise.
+    // ── Performance index (Rolling) ──────────────────────────────────────────
+    // Only reviews within the RPI rolling window are used — lifetime averages
+    // misrepresent interns whose recent performance differs from their history.
     let resolvedPerformanceIndex = performanceIndex ?? DEFAULT_PERFORMANCE_INDEX;
     if (internId) {
-      const reviews = await prisma.review.findMany({ where: { internId } });
+      const reviews = await prisma.review.findMany({
+        where: {
+          internId,
+          createdAt: { gte: getRpiWindowStart() },
+        },
+      });
       const { performanceIndex: computed } = computePerformanceIndex(reviews);
       resolvedPerformanceIndex = computed || DEFAULT_PERFORMANCE_INDEX;
     }
@@ -57,23 +63,36 @@ async function processInternCapacity({
         const credResult = await computeCredibilityScore(internId);
         resolvedCredibilityScore = credResult.scoreOut100; // 0–100 integer
       } catch (credErr) {
-        console.warn('[processInternCapacity] Credibility fetch failed — using fallback:', credErr.message);
+        logger.warn({ err: credErr, internId }, 'Credibility fetch failed — using fallback');
         // Keep resolvedCredibilityScore as the caller-supplied value or default
       }
     }
 
     const availability = computeAvailabilityIntelligence(busyBlocksList, maxFreeBlockHours, weekStatusToggle);
     const TLI = computeTaskLoadIndex(tasksList);
+
+    // Fetch the intern's active reservation so the capacity engine can apply
+    // the −20 penalty if a task was recently assigned but not yet synced from Plane.
+    let reservedUntil = null;
+    if (internId) {
+      const internRecord = await prisma.intern.findUnique({
+        where:  { id: internId },
+        select: { reservedUntil: true },
+      });
+      reservedUntil = internRecord?.reservedUntil ?? null;
+    }
+
     const { capacityScore, capacityLabel } = calculateCapacityScore({
       availabilityScore: availability.availabilityScore,
       tli: TLI,
-      weekStatusToggle,   // preferred: drives exam/heavy-load penalty
-      examFlag,           // legacy fallback when weekStatusToggle is absent
+      weekStatusToggle,
+      examFlag,
       performanceIndex: resolvedPerformanceIndex,
       credibilityScore: resolvedCredibilityScore,
+      reservedUntil,
     });
 
-    console.log('[INFO] Capacity score computed:', capacityScore);
+    logger.info({ internId, capacityScore }, 'Capacity score computed');
 
     return {
       availability,

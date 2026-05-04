@@ -12,14 +12,21 @@
  */
 
 const { ERROR_CODES } = require('../utils/respond');
+const logger = require('../utils/logger');
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   const status = typeof err.status === 'number' ? err.status : 500;
   const isClientError = status >= 400 && status < 500;
 
-  // Always log the full error server-side for debugging
-  console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} → ${status}`, err);
+  // Always log the full error server-side for debugging.
+  // 4xx are info-level (expected client mistakes); 5xx are error-level (unexpected).
+  const logPayload = { method: req.method, path: req.path, status, err };
+  if (isClientError) {
+    logger.info(logPayload, 'client error');
+  } else {
+    logger.error(logPayload, 'server error');
+  }
 
   const message = isClientError
     ? (err.message || 'Bad request.')

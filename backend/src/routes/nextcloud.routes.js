@@ -3,6 +3,7 @@ const router = express.Router();
 const { uploadToNextcloud } = require('../services/storage.service');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { ROLES } = require('../constants/roles');
+const logger = require('../utils/logger');
 
 // Test route for Nextcloud integration — admin only
 router.get('/test-nextcloud', verifyToken, requireRole(ROLES.ADMIN), async (req, res) => {
@@ -29,7 +30,7 @@ router.get('/test-nextcloud', verifyToken, requireRole(ROLES.ADMIN), async (req,
       });
     }
   } catch (error) {
-    console.error('[test-nextcloud] Error:', error);
+    logger.error({ err: error }, 'test-nextcloud route failed');
     return res.status(500).json({
       success: false,
       message: 'Internal server error',

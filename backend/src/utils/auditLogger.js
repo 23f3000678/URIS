@@ -16,6 +16,7 @@
  */
 
 const prisma = require('./prisma');
+const logger = require('./logger');
 
 async function logAction(userId, action, entity, entityId = null, metadata = {}) {
   try {
@@ -29,10 +30,8 @@ async function logAction(userId, action, entity, entityId = null, metadata = {})
       },
     });
   } catch (err) {
-    // Log to console but never propagate — audit failure is non-fatal
-    console.error('[AuditLogger] Failed to write audit log:', err.message, {
-      userId, action, entity, entityId,
-    });
+    // Log but never propagate — audit failure is non-fatal
+    logger.error({ err, userId, action, entity, entityId }, 'Failed to write audit log');
   }
 }
 

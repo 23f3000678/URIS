@@ -1,10 +1,33 @@
-const axios = require('axios');
-const prisma = require('../utils/prisma');
+const axios      = require('axios');
+const axiosRetry = require('axios-retry').default;
+const prisma     = require('../utils/prisma');
+const logger     = require('../utils/logger');
 
 const PLANE_BASE_URL  = process.env.PLANE_BASE_URL;
 const PLANE_API_KEY   = process.env.PLANE_API_KEY;
 const WORKSPACE_SLUG  = process.env.PLANE_WORKSPACE_SLUG;
 const PROJECT_ID      = process.env.PLANE_PROJECT_ID;
+
+// ── Plane.so HTTP client ──────────────────────────────────────────────────────
+// Dedicated axios instance with:
+//   - 10 s request timeout (Plane has no SLA; bare axios has no timeout)
+//   - 3 retries with exponential backoff on network errors and 5xx responses
+//   - No retry on 4xx (bad request / auth failure — retrying won't help)
+const axiosPlane = axios.create({
+  timeout: parseInt(process.env.PLANE_REQUEST_TIMEOUT_MS) || 10_000,
+});
+
+axiosRetry(axiosPlane, {
+  retries:           3,
+  retryDelay:        axiosRetry.exponentialDelay,   // 1 s, 2 s, 4 s
+  retryCondition:    (err) => {
+    // Retry on network errors (ECONNRESET, ETIMEDOUT, etc.) and 5xx only
+    return axiosRetry.isNetworkError(err) || axiosRetry.isRetryableError(err);
+  },
+  onRetry: (retryCount, err) => {
+    logger.warn({ retryCount, status: err.response?.status, message: err.message }, 'Plane API retry');
+  },
+});
 
 function mapPriorityToComplexity(priority) {
   const map = { urgent: 3, high: 2.5, medium: 2, low: 1, none: 1 };
@@ -18,7 +41,7 @@ function mapStateToProgress(stateGroup) {
 
 async function syncTasksFromPlane() {
   try {
-    const response = await axios.get(
+    const response = await axiosPlane.get(
       `${PLANE_BASE_URL}/workspaces/${WORKSPACE_SLUG}/projects/${PROJECT_ID}/issues/`,
       { headers: { 'x-api-key': PLANE_API_KEY }, params: { per_page: 100 } }
     );
@@ -53,11 +76,77 @@ async function syncTasksFromPlane() {
           deadline:      issue.due_date ? new Date(issue.due_date) : null,
         }
       });
+
+      // Clear the soft reservation now that Plane has confirmed the task —
+      // the intern's capacity score will reflect the real task load on next compute.
+      await prisma.intern.updateMany({
+        where: { id: assigneeId, reservedUntil: { not: null } },
+        data:  { reservedUntil: null },
+      });
     }
 
     return { synced: issues.length };
   } catch (err) {
-    console.error('[taskService] syncTasksFromPlane error:', err.message);
+    logger.error({ err }, 'syncTasksFromPlane failed');
+    return { synced: 0, error: err.message };
+  }
+}
+
+/**
+ * Sync a single Plane issue by its ID instead of pulling the full list.
+ * Called by the webhook receiver on issue.created / issue.updated events
+ * to avoid a full poll when only one issue changed.
+ *
+ * @param {string} issueId — Plane issue UUID
+ * @returns {Promise<{ synced: number, error?: string }>}
+ */
+async function syncSingleIssueFromPlane(issueId) {
+  try {
+    const response = await axiosPlane.get(
+      `${PLANE_BASE_URL}/workspaces/${WORKSPACE_SLUG}/projects/${PROJECT_ID}/issues/${issueId}/`,
+      { headers: { 'x-api-key': PLANE_API_KEY } }
+    );
+
+    const issue = response.data;
+    if (!issue?.id) {
+      return { synced: 0, error: 'Issue not found in Plane response' };
+    }
+
+    const assigneeId = issue.assignees?.[0] ?? null;
+    if (!assigneeId) {
+      logger.warn({ issueId }, 'syncSingleIssueFromPlane — issue has no assignee, skipping upsert');
+      return { synced: 0 };
+    }
+
+    await prisma.intern.upsert({ where: { id: assigneeId }, update: {}, create: { id: assigneeId } });
+
+    await prisma.task.upsert({
+      where: { planeTaskId: issue.id },
+      update: {
+        progressPct:   mapStateToProgress(issue.state?.group),
+        status:        issue.state?.group === 'completed' ? 'completed' : 'active',
+        hasBlocker:    !!(issue.label_ids?.length && issue.description?.toLowerCase().includes('blocked')),
+        lastUpdatedAt: new Date(issue.updated_at),
+        deadline:      issue.due_date ? new Date(issue.due_date) : null,
+      },
+      create: {
+        planeTaskId:   issue.id,
+        internId:      assigneeId,
+        title:         issue.name,
+        complexity:    mapPriorityToComplexity(issue.priority),
+        progressPct:   mapStateToProgress(issue.state?.group),
+        status:        'active',
+        hasBlocker:    false,
+        skills:        issue.label_ids ?? [],
+        lastUpdatedAt: new Date(issue.updated_at),
+        deadline:      issue.due_date ? new Date(issue.due_date) : null,
+      },
+    });
+
+    logger.info({ issueId, assigneeId }, 'syncSingleIssueFromPlane completed');
+    return { synced: 1 };
+  } catch (err) {
+    logger.error({ err, issueId }, 'syncSingleIssueFromPlane failed');
     return { synced: 0, error: err.message };
   }
 }
@@ -142,4 +231,4 @@ function getTLIBand(tli) {
   return 'High';
 }
 
-module.exports = { syncTasksFromPlane, computeTLI, getTLIForIntern, detectAndMarkStaleTasks, getTasksOverviewForAllInterns, getTLIBand };
+module.exports = { syncTasksFromPlane, syncSingleIssueFromPlane, computeTLI, getTLIForIntern, detectAndMarkStaleTasks, getTasksOverviewForAllInterns, getTLIBand };

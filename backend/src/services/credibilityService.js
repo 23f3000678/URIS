@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 
 const WINDOW_DAYS        = 14;
 const UPDATE_WEIGHT      = 0.35;
@@ -62,7 +63,7 @@ async function computeCredibilityScore(internId, baseCapacity = 0.5) {
         create: { id: internId }
       });
     } catch (error) {
-      console.error('[ERROR] Credibility upsert failed:', error.message);
+      logger.error({ err: error, internId }, 'Credibility intern upsert failed');
     }
 
     await prisma.credibilityScore.upsert({
@@ -95,7 +96,7 @@ async function computeCredibilityScore(internId, baseCapacity = 0.5) {
       flag:        roundedScore < 0.5 ? 'low_credibility' : null
     };
   } catch (err) {
-    console.error('[credibilityService] computeCredibilityScore error:', err.message);
+    logger.error({ err, internId }, 'computeCredibilityScore failed');
     throw err;
   }
 }

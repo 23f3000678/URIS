@@ -269,9 +269,8 @@ const createTask = Joi.object({
     internId: uuid.required().messages({
       'any.required': 'internId is required',
     }),
-    planeTaskId: Joi.string().trim().min(1).max(100).required().messages({
-      'string.max':   'planeTaskId must not exceed 100 characters',
-      'any.required': 'planeTaskId is required',
+    planeTaskId: Joi.string().trim().min(1).max(100).optional().allow('', null).messages({
+      'string.max': 'planeTaskId must not exceed 100 characters',
     }),
     // Design §8.1 — task_complexity INTEGER CHECK(1..5)
     complexity: Joi.number().integer().min(1).max(5).required().messages({

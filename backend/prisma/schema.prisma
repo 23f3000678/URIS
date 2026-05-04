@@ -27,7 +27,9 @@ model User {
   id        String     @id @default(uuid())
   email     String     @unique
   password  String     // bcrypt hash only — never plain text
+  name      String     @default("")   // display name supplied at registration
   role      Role       @default(INTERN)
+  status    String     @default("active")  // "active" | "pending" (admin registrations await approval)
   createdAt DateTime   @default(now())
   intern    Intern?
   teams     UserTeam[]
@@ -38,6 +40,9 @@ model Intern {
   userId            String?           @unique
   user              User?             @relation(fields: [userId], references: [id])
   overrideScore     Float?
+  reservedUntil     DateTime?         // soft reservation expiry — set on task assignment,
+                                      // cleared when Plane sync confirms the task is active.
+                                      // While active, capacity engine applies a −20 penalty.
   createdAt         DateTime          @default(now())
   availabilitySlots AvailabilitySlot[]
   tasks             Task[]
@@ -213,4 +218,37 @@ model AuditLog {
   @@index([action])
   @@index([entity])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// System Config
+// ---------------------------------------------------------------------------
+
+model Config {
+  key       String   @id                 // unique setting name, e.g. "availabilityDeadline"
+  value     Json                         // arbitrary JSON value
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Digest
+// ---------------------------------------------------------------------------
+// One row per intern per week. Written by the digest scheduler every Monday.
+// Provides a point-in-time snapshot for trend analysis and admin review.
+
+model InternDigest {
+  id               String   @id @default(uuid())
+  internId         String
+  weekStart        DateTime @db.Date      // Monday of the digest week
+  capacityScore    Float                  // snapshot from ScoreHistory
+  credibilityScore Float                  // snapshot from CredibilityScore
+  performanceIndex Float                  // rolling RPI at time of digest
+  activeTasks      Int
+  completedTasks   Int
+  openAlerts       Int
+  generatedAt      DateTime @default(now())
+
+  @@unique([internId, weekStart])
+  @@index([internId])
+  @@index([weekStart])
 }

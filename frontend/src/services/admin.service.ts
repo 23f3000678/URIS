@@ -41,3 +41,19 @@ export async function getAvailabilityDeadline(): Promise<AvailabilityDeadline> {
 export async function setAvailabilityDeadline(payload: AvailabilityDeadline): Promise<void> {
   await api.post('/admin/availability-deadline', payload)
 }
+
+export interface PendingUser {
+  id:        string
+  email:     string
+  role:      string
+  createdAt: string
+}
+
+export async function getPendingUsers(): Promise<PendingUser[]> {
+  const res = await api.get<{ success: boolean; data: PendingUser[] }>('/admin/pending-users')
+  return res.data.data
+}
+
+export async function approveUser(userId: string): Promise<void> {
+  await api.post('/admin/approve-user', { userId })
+}

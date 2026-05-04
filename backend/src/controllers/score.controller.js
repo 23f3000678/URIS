@@ -20,9 +20,14 @@ async function getScoreHistory(req, res, next) {
       }
     }
 
+    const take = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const skip = parseInt(req.query.offset, 10) || 0;
+
     const history = await prisma.scoreHistory.findMany({
       where:   { internId },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
 
     return ok(res, history);

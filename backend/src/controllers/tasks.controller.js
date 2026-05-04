@@ -6,6 +6,8 @@ const prisma = require('../utils/prisma');
 const { logAction } = require('../utils/auditLogger');
 const { AUDIT_ACTIONS, AUDIT_ENTITIES } = require('../constants/auditActions');
 const { validatePagination } = require('../utils/validate');
+const { randomUUID } = require('crypto');
+const logger = require('../utils/logger');
 
 async function getTasksOverview(req, res) {
   try {
@@ -21,7 +23,7 @@ async function getTasksOverview(req, res) {
       data: overview
     });
   } catch (err) {
-    console.error('[tasksController] getTasksOverview error:', err.message);
+    logger.error({ err }, 'getTasksOverview failed');
     res.status(500).json({ success: false, message: 'Failed to fetch task overview.', data: null });
   }
 }
@@ -92,7 +94,7 @@ async function getTasks(req, res, next) {
       intern:   undefined,
     }));
 
-    console.log('[INFO] Tasks fetched:', tasks.length);
+    logger.info({ count: tasks.length }, 'Tasks fetched');
 
     return res.status(200).json({
       success: true,
@@ -106,7 +108,11 @@ async function getTasks(req, res, next) {
 
 async function createTask(req, res, next) {
   try {
-    const { title, complexity, internId, planeTaskId, skills = [], deadline } = req.body;
+    const { title, complexity, internId, skills = [], deadline } = req.body;
+
+    // Use the provided planeTaskId or generate a unique fallback so tasks
+    // created without a Plane integration still satisfy the @unique constraint.
+    const planeTaskId = req.body.planeTaskId?.trim() || `manual-${randomUUID()}`;
 
     // Business-level rules: integer complexity, future deadline, unique planeTaskId, intern exists
     const biz = await validateTaskCreation({ complexity, deadline, planeTaskId, internId });
@@ -129,7 +135,7 @@ async function createTask(req, res, next) {
       },
     });
 
-    console.log('[INFO] Task created:', task.id);
+    logger.info({ taskId: task.id }, 'Task created');
 
     void logAction(req.user?.id ?? null, AUDIT_ACTIONS.CREATE_TASK, AUDIT_ENTITIES.TASK, task.id, {
       title, internId, complexity, planeTaskId,
