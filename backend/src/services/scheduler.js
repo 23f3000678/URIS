@@ -13,11 +13,11 @@
  *      - generateWeeklyDigest() — snapshots capacity/credibility/RPI per intern
  *
  * Configuration:
- *   SYNC_INTERVAL_CRON — 5-field cron for the sync job (default: "*\/15 * * * *")
- *   DIGEST_CRON        — 5-field cron for the digest job (default: "0 8 * * 1")
- *
+ *   SYNC_INTERVAL_CRON — 5-field cron for the sync job (default: "*/15 * * * * ")
+  * DIGEST_CRON        — 5 - field cron for the digest job(default: "0 8 * * 1")
+    *
  * Both jobs are skipped when NODE_ENV === 'test'.
- * Call scheduler.stop() on SIGINT/SIGTERM to clean up cron tasks.
+ * Call scheduler.stop() on SIGINT / SIGTERM to clean up cron tasks.
  */
 
 const cron = require('node-cron');
@@ -31,8 +31,6 @@ const DEFAULT_DIGEST_CRON = '0 8 * * 1';   // Monday 08:00 UTC
 
 let _syncTask = null;
 let _digestTask = null;
-
-// ── Internal helpers ──────────────────────────────────────────────────────────
 
 function _startSyncJob() {
   const expression = process.env.SYNC_INTERVAL_CRON || DEFAULT_SYNC_CRON;
@@ -95,12 +93,6 @@ function _startDigestJob() {
   });
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
-/**
- * Start all scheduled jobs.
- * Safe to call multiple times — subsequent calls are no-ops if already running.
- */
 function start() {
   if (_syncTask || _digestTask) {
     logger.warn('Scheduler already running — ignoring duplicate start() call');
@@ -110,10 +102,6 @@ function start() {
   _startDigestJob();
 }
 
-/**
- * Stop all scheduled jobs and release resources.
- * Called during graceful shutdown (SIGINT / SIGTERM).
- */
 function stop() {
   if (_syncTask) {
     _syncTask.stop();
