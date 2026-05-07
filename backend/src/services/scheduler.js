@@ -1,24 +1,22 @@
 'use strict';
 
-/**
- * scheduler.js — periodic background sync scheduler.
- *
- * Jobs:
- *   1. Sync scheduler (SYNC_INTERVAL_CRON, default every 15 min):
- *      - syncTasksFromPlane()
- *      - detectAndMarkStaleTasks()
- *      - generateBlockerAlerts()
- *
- *   2. Weekly digest (DIGEST_CRON, default Monday 08:00 UTC):
- *      - generateWeeklyDigest() — snapshots capacity/credibility/RPI per intern
- *
- * Configuration:
- *   SYNC_INTERVAL_CRON — 5-field cron for the sync job (default: "*/15 * * * *")
- *   DIGEST_CRON        — 5-field cron for the digest job (default: "0 8 * * 1")
- *
- * Both jobs are skipped when NODE_ENV === 'test'.
- * Call scheduler.stop() on SIGINT / SIGTERM to clean up cron tasks.
- */
+// scheduler.js — periodic background sync scheduler.
+//
+// Jobs:
+//   1. Sync scheduler (SYNC_INTERVAL_CRON, default every 15 min):
+//      - syncTasksFromPlane()
+//      - detectAndMarkStaleTasks()
+//      - generateBlockerAlerts()
+//
+//   2. Weekly digest (DIGEST_CRON, default Monday 08:00 UTC):
+//      - generateWeeklyDigest() — snapshots capacity/credibility/RPI per intern
+//
+// Configuration:
+//   SYNC_INTERVAL_CRON — 5-field cron for the sync job (default: "*/15 * * * *")
+//   DIGEST_CRON        — 5-field cron for the digest job (default: "0 8 * * 1")
+//
+// Both jobs are skipped when NODE_ENV === 'test'.
+// Call scheduler.stop() on SIGINT / SIGTERM to clean up cron tasks.
 
 const cron = require('node-cron');
 const logger = require('../utils/logger');
