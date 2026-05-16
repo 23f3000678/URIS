@@ -102,7 +102,7 @@ async function submitReview(req, res, next) {
     const { taskId, internId, qualityScore, timelinessScore, independenceScore, reviewNotes } = req.body;
 
     // Business-level rules: integer scores, task exists, task completed, intern matches, no duplicate
-    const biz = await validateReviewSubmission({ taskId, internId, qualityScore, timelinessScore, independenceScore });
+    const biz = await validateReviewSubmission({ taskId, internId, qualityScore, timelinessScore, independenceScore, user: req.user });
     if (!biz.ok) {
       return businessError(res, biz.status, biz.message);
     }

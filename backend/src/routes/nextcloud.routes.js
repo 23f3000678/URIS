@@ -5,8 +5,10 @@ const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { ROLES } = require('../constants/roles');
 const logger = require('../utils/logger');
 
+const ADMIN_ROLES = [ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD, ROLES.OPERATIONS_LEAD, ROLES.RESEARCH_LEAD];
+
 // Test route for Nextcloud integration — admin only
-router.get('/test-nextcloud', verifyToken, requireRole(ROLES.ADMIN), async (req, res) => {
+router.get('/test-nextcloud', verifyToken, requireRole(...ADMIN_ROLES), async (req, res) => {
   try {
     const sampleData = {
       test: true,

@@ -9,7 +9,7 @@ const THROUGHPUT_WEIGHT  = 0.25;
 async function computeUpdateFrequency(internId) {
   const windowStart = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const tasks = await prisma.task.findMany({
-    where: { internId, createdAt: { gt: windowStart }, status: { not: 'completed' } }
+    where: { internId, createdAt: { gt: windowStart }, status: { not: 'completed' }, deletedAt: null }
   });
   if (tasks.length === 0) return 0.5;
 

@@ -24,7 +24,9 @@ router.post('/:teamId/join',  verifyToken, validate(schemas.joinTeam),          
 router.post('/:teamId/leave', verifyToken, validate(schemas.teamIdParam),                           leaveTeamHandler);
 router.get('/:teamId/contribution', verifyToken, validate(schemas.teamIdParam),                     getContributionHandler);
 
+const ADMIN_ROLES = [ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD, ROLES.OPERATIONS_LEAD, ROLES.RESEARCH_LEAD];
+
 // ── Admin only ────────────────────────────────────────────────────────────────
-router.post('/', verifyToken, requireRole(ROLES.ADMIN), validate(schemas.createTeam), createTeamHandler);
+router.post('/', verifyToken, requireRole(...ADMIN_ROLES), validate(schemas.createTeam), createTeamHandler);
 
 module.exports = router;

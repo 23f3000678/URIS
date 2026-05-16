@@ -74,13 +74,21 @@ async function generateWeeklyDigest() {
         }),
         // Reviews within the rolling RPI window
         prisma.review.findMany({
-          where:  { internId, createdAt: { gte: getRpiWindowStart() } },
+          where:  { 
+            internId, 
+            createdAt: { gte: getRpiWindowStart() },
+            task: { deletedAt: null }
+          },
           select: { quality: true, timeliness: true, initiative: true, complexity: true },
         }),
         // Active and completed task counts
         prisma.task.groupBy({
           by:     ['status'],
-          where:  { internId, status: { in: ['active', 'completed'] } },
+          where:  { 
+            internId, 
+            status: { in: ['active', 'completed'] },
+            deletedAt: null 
+          },
           _count: { _all: true },
         }),
         // Open (unresolved) alert count

@@ -75,6 +75,11 @@ export async function updateTaskProgress(taskId: string, payload: UpdateProgress
   await api.patch(`/tasks/${taskId}/progress`, payload)
 }
 
+export async function deleteTask(taskId: string): Promise<void> {
+  const res = await api.delete(`/tasks/${taskId}`)
+  if (!res.data.success) throw new Error(res.data.message)
+}
+
 export interface TaskReview {
   id:         string
   taskId:     string

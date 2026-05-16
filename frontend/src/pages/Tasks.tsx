@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, ChevronUp, AlertOctagon, Clock, Flag, Plus, X, Loader2, AlertTriangle, CheckCircle2, Pause, Play, ShieldAlert, Star } from 'lucide-react'
+import { ChevronDown, ChevronUp, AlertOctagon, Clock, Flag, Plus, X, Loader2, AlertTriangle, CheckCircle2, Pause, Play, ShieldAlert, Star, Trash2 } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
-import { getAllTasks, createTask, updateTaskProgress, adminControlTask, getReviewForTask, type Task, type TaskReview } from '../services/tasks.service'
+import { getAllTasks, createTask, updateTaskProgress, adminControlTask, getReviewForTask, deleteTask, type Task, type TaskReview } from '../services/tasks.service'
 import { useAuthStore } from '../store/authStore'
 import { extractErrorMessage } from '../services/error'
 
@@ -169,6 +169,16 @@ export default function Tasks() {
       setAdminControlError(extractErrorMessage(err, 'Failed to update task.'))
     } finally {
       setAdminControlling(false)
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm('Are you sure you want to remove this task? This will not affect any person\'s score or calculations.')) return
+    try {
+      await deleteTask(taskId)
+      await fetchData()
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Failed to delete task.'))
     }
   }
 
@@ -455,6 +465,12 @@ export default function Tasks() {
                                         <Flag size={9} />FLAG BLOCKER
                                       </motion.button>
                                     )}
+                                    <motion.button whileTap={{ scale: 0.97 }}
+                                      onClick={() => handleDeleteTask(task.id)}
+                                      className="nav-label text-[0.6rem] px-3 py-1.5 rounded-sm flex items-center gap-1.5 transition-all ml-auto"
+                                      style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', color: '#f87171' }}>
+                                      <Trash2 size={9} />REMOVE TASK
+                                    </motion.button>
                                   </div>
                                 )}
                               </div>

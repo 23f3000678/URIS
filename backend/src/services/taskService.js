@@ -9,19 +9,14 @@ const WORKSPACE_SLUG  = process.env.PLANE_WORKSPACE_SLUG;
 const PROJECT_ID      = process.env.PLANE_PROJECT_ID;
 
 // ── Plane.so HTTP client ──────────────────────────────────────────────────────
-// Dedicated axios instance with:
-//   - 10 s request timeout (Plane has no SLA; bare axios has no timeout)
-//   - 3 retries with exponential backoff on network errors and 5xx responses
-//   - No retry on 4xx (bad request / auth failure — retrying won't help)
 const axiosPlane = axios.create({
   timeout: parseInt(process.env.PLANE_REQUEST_TIMEOUT_MS) || 10_000,
 });
 
 axiosRetry(axiosPlane, {
   retries:           3,
-  retryDelay:        axiosRetry.exponentialDelay,   // 1 s, 2 s, 4 s
+  retryDelay:        axiosRetry.exponentialDelay,
   retryCondition:    (err) => {
-    // Retry on network errors (ECONNRESET, ETIMEDOUT, etc.) and 5xx only
     return axiosRetry.isNetworkError(err) || axiosRetry.isRetryableError(err);
   },
   onRetry: (retryCount, err) => {
@@ -40,7 +35,6 @@ function mapStateToProgress(stateGroup) {
 }
 
 async function syncTasksFromPlane() {
-  // Skip silently if Plane is not configured — avoids noisy errors in local dev
   if (!PLANE_BASE_URL || !PLANE_API_KEY || !WORKSPACE_SLUG || !PROJECT_ID) {
     logger.debug('Plane not configured — skipping syncTasksFromPlane');
     return { synced: 0 };
@@ -83,8 +77,6 @@ async function syncTasksFromPlane() {
         }
       });
 
-      // Clear the soft reservation now that Plane has confirmed the task —
-      // the intern's capacity score will reflect the real task load on next compute.
       await prisma.intern.updateMany({
         where: { id: assigneeId, reservedUntil: { not: null } },
         data:  { reservedUntil: null },
@@ -98,16 +90,7 @@ async function syncTasksFromPlane() {
   }
 }
 
-/**
- * Sync a single Plane issue by its ID instead of pulling the full list.
- * Called by the webhook receiver on issue.created / issue.updated events
- * to avoid a full poll when only one issue changed.
- *
- * @param {string} issueId — Plane issue UUID
- * @returns {Promise<{ synced: number, error?: string }>}
- */
 async function syncSingleIssueFromPlane(issueId) {
-  // Skip silently if Plane is not configured
   if (!PLANE_BASE_URL || !PLANE_API_KEY || !WORKSPACE_SLUG || !PROJECT_ID) {
     logger.debug('Plane not configured — skipping syncSingleIssueFromPlane');
     return { synced: 0 };
@@ -155,7 +138,6 @@ async function syncSingleIssueFromPlane(issueId) {
       },
     });
 
-    logger.info({ issueId, assigneeId }, 'syncSingleIssueFromPlane completed');
     return { synced: 1 };
   } catch (err) {
     logger.error({ err, issueId }, 'syncSingleIssueFromPlane failed');
@@ -172,9 +154,16 @@ function computeTLI(tasks = []) {
 
 async function getTLIForIntern(internId) {
   const activeTasks = await prisma.task.findMany({
-    where: { internId, status: 'active' }
+    where: { internId, status: 'active', deletedAt: null }
   });
   return computeTLI(activeTasks);
+}
+
+async function removeTask(taskId) {
+  return prisma.task.update({
+    where: { id: taskId },
+    data: { deletedAt: new Date() }
+  });
 }
 
 async function detectAndMarkStaleTasks() {
@@ -192,7 +181,6 @@ async function detectAndMarkStaleTasks() {
 
   for (const task of staleTasks) {
     await prisma.task.update({ where: { id: task.id }, data: { status: 'stale' } });
-
     const existing = await prisma.alert.findFirst({
       where: { taskId: task.id, type: 'stale_task', resolved: false }
     });
@@ -207,14 +195,9 @@ async function detectAndMarkStaleTasks() {
       });
     }
   }
-
   return staleTasks.length;
 }
 
-/**
- * Generate deadline-approaching alerts for interns whose tasks are due within 48 hours.
- * Runs as part of the periodic sync job.
- */
 async function generateDeadlineAlerts() {
   const now          = new Date();
   const in48Hours    = new Date(now.getTime() + 48 * 60 * 60 * 1000);
@@ -242,8 +225,8 @@ async function generateDeadlineAlerts() {
         type:     'deadline_approaching',
         severity: isVeryUrgent ? 'critical' : 'warning',
         message:  isVeryUrgent
-          ? `URGENT: Task "${task.title}" is due in less than 24 hours. Current progress: ${task.progressPct}%.`
-          : `Task "${task.title}" is due within 48 hours. Current progress: ${task.progressPct}%. Make sure to update your progress.`,
+          ? `URGENT: Task "${task.title}" is due in less than 24 hours.`
+          : `Task "${task.title}" is due within 48 hours.`,
       },
     });
     created++;
@@ -251,10 +234,6 @@ async function generateDeadlineAlerts() {
   return created;
 }
 
-/**
- * Generate availability reminder alerts for interns who have not submitted
- * availability for the current week. Runs Monday morning.
- */
 async function generateAvailabilityReminders() {
   const monday = new Date();
   const day = monday.getUTCDay();
@@ -262,7 +241,6 @@ async function generateAvailabilityReminders() {
   monday.setUTCDate(monday.getUTCDate() + diff);
   monday.setUTCHours(0, 0, 0, 0);
 
-  // Find all interns who have NOT submitted availability for this week
   const allInterns = await prisma.intern.findMany({
     select: { id: true, user: { select: { name: true, email: true } } },
   });
@@ -293,7 +271,7 @@ async function generateAvailabilityReminders() {
         internId: intern.id,
         type:     'availability_reminder',
         severity: 'warning',
-        message:  `${internName} has not submitted availability for this week. Tasks cannot be assigned until availability is confirmed.`,
+        message:  `${internName} has not submitted availability for this week.`,
       },
     });
     created++;
@@ -302,7 +280,13 @@ async function generateAvailabilityReminders() {
 }
 
 async function getTasksOverviewForAllInterns() {
-  const interns = await prisma.intern.findMany({ include: { tasks: true } });
+  const interns = await prisma.intern.findMany({ 
+    include: { 
+      tasks: {
+        where: { deletedAt: null }
+      } 
+    } 
+  });
 
   return interns.map(intern => {
     const activeTasks    = intern.tasks.filter(t => t.status === 'active');
@@ -333,4 +317,67 @@ function getTLIBand(tli) {
   return 'High';
 }
 
-module.exports = { syncTasksFromPlane, syncSingleIssueFromPlane, computeTLI, getTLIForIntern, detectAndMarkStaleTasks, getTasksOverviewForAllInterns, getTLIBand, generateDeadlineAlerts, generateAvailabilityReminders };
+async function getTaskFilter(user) {
+  const { ROLES } = require('../constants/roles');
+  const filter = { deletedAt: null };
+  
+  switch (user.role) {
+    case ROLES.CORE_ADMIN:
+    case ROLES.OPERATIONS_LEAD:
+      // Can see all tasks
+      break;
+      
+    case ROLES.TECHNICAL_LEAD:
+    case ROLES.RESEARCH_LEAD: {
+      // ONLY own team
+      const leadTeams = await prisma.userTeam.findMany({
+        where: { userId: user.id, role: 'lead', leftAt: null },
+        select: { teamId: true }
+      });
+      filter.teamId = { in: leadTeams.map(t => t.teamId) };
+      break;
+    }
+      
+    case ROLES.OPERATIONS_PROGRAM_MANAGER:
+      // operational tasks only
+      filter.isOperational = true;
+      break;
+      
+    case ROLES.TECHNICAL_INTERN:
+    case ROLES.RESEARCH_INTERN:
+    case ROLES.OPERATIONS_INTERN: {
+      const intern = await prisma.intern.findUnique({ where: { userId: user.id } });
+      filter.internId = intern?.id || 'none';
+      break;
+    }
+      
+    case ROLES.OBSERVER_TEAM_LEAD:
+      // ONLY observed tasks
+      filter.observerIds = { has: user.id };
+      break;
+      
+    case ROLES.COLLABORATOR_LEAD:
+      // collaborator-linked tasks
+      filter.collaboratorIds = { has: user.id };
+      break;
+      
+    default:
+      filter.id = 'none';
+  }
+  
+  return filter;
+}
+
+module.exports = { 
+  syncTasksFromPlane, 
+  syncSingleIssueFromPlane, 
+  computeTLI, 
+  getTLIForIntern, 
+  removeTask, 
+  detectAndMarkStaleTasks, 
+  getTasksOverviewForAllInterns, 
+  getTLIBand, 
+  generateDeadlineAlerts, 
+  generateAvailabilityReminders,
+  getTaskFilter
+};

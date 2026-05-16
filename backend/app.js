@@ -92,6 +92,7 @@ app.use('/activity',     activityRoutes);
 app.use('/teams',        teamRoutes);
 app.use('/health',       healthRoutes);
 app.use('/',             nextcloudRoutes);
+app.use('/portfolio',   require('./src/routes/portfolio.routes.js'));
 app.use(errorHandler);
 
 const prisma    = require('./src/utils/prisma');

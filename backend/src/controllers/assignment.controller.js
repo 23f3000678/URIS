@@ -77,7 +77,7 @@ async function assignTask(req, res, next) {
     const { internId, taskId } = req.body;
 
     // Business-level rules: intern exists, task exists, no duplicate assignment, task not completed
-    const biz = await validateTaskAssignment({ internId, taskId });
+    const biz = await validateTaskAssignment({ internId, taskId, user: req.user });
     if (!biz.ok) {
       return res.status(biz.status).json({ success: false, message: biz.message, data: null });
     }

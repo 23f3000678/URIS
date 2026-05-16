@@ -16,13 +16,20 @@
  * Never use raw role strings anywhere else — always import from this file.
  */
 
-/** @type {{ INTERN: 'INTERN', ADMIN: 'ADMIN' }} */
+/** @type {Object.<string, string>} */
 const ROLES = Object.freeze({
-  INTERN: 'INTERN',
-  ADMIN:  'ADMIN',
-  // Future roles — uncomment and migrate when needed:
-  // TEAM_LEAD: 'TEAM_LEAD',
-  // MANAGER:   'MANAGER',
+  CORE_ADMIN:                 'CORE_ADMIN',
+  TECHNICAL_LEAD:             'TECHNICAL_LEAD',
+  OPERATIONS_LEAD:            'OPERATIONS_LEAD',
+  RESEARCH_LEAD:              'RESEARCH_LEAD',
+  OPERATIONS_PROGRAM_MANAGER: 'OPERATIONS_PROGRAM_MANAGER',
+  TECHNICAL_INTERN:           'TECHNICAL_INTERN',
+  OPERATIONS_INTERN:          'OPERATIONS_INTERN',
+  RESEARCH_INTERN:            'RESEARCH_INTERN',
+  OBSERVER_TEAM_LEAD:         'OBSERVER_TEAM_LEAD',
+  COLLABORATOR_LEAD:          'COLLABORATOR_LEAD',
+  ORENDA_MEMBER:              'ORENDA_MEMBER',
+  PAST_EMPLOYEE:              'PAST_EMPLOYEE',
 });
 
 /**
@@ -35,10 +42,6 @@ const VALID_ROLES = new Set(Object.values(ROLES));
  * Maps any incoming role string (from API requests or UI) to a valid
  * Prisma Role enum value. Case-insensitive.
  *
- * Accepted inputs:
- *   "intern" → "INTERN"
- *   "admin"  → "ADMIN"
- *
  * Returns null for unrecognised values.
  *
  * @param {string} role
@@ -46,14 +49,30 @@ const VALID_ROLES = new Set(Object.values(ROLES));
  */
 function normalizeRole(role) {
   if (typeof role !== 'string') return null;
+  const input = role.toLowerCase().trim();
+  
   const map = {
-    intern: ROLES.INTERN,
-    admin:  ROLES.ADMIN,
-    // Add aliases for future roles here:
-    // team_lead: ROLES.TEAM_LEAD,
-    // manager:   ROLES.MANAGER,
+    'core_admin':                 ROLES.CORE_ADMIN,
+    'admin':                      ROLES.CORE_ADMIN,
+    'technical_lead':             ROLES.TECHNICAL_LEAD,
+    'operations_lead':            ROLES.OPERATIONS_LEAD,
+    'research_lead':              ROLES.RESEARCH_LEAD,
+    'operations_program_manager': ROLES.OPERATIONS_PROGRAM_MANAGER,
+    'program_manager':            ROLES.OPERATIONS_PROGRAM_MANAGER,
+    'technical_intern':           ROLES.TECHNICAL_INTERN,
+    'intern':                     ROLES.TECHNICAL_INTERN,
+    'operations_intern':          ROLES.OPERATIONS_INTERN,
+    'research_intern':            ROLES.RESEARCH_INTERN,
+    'observer_team_lead':         ROLES.OBSERVER_TEAM_LEAD,
+    'observer':                   ROLES.OBSERVER_TEAM_LEAD,
+    'collaborator_lead':          ROLES.COLLABORATOR_LEAD,
+    'collaborator':               ROLES.COLLABORATOR_LEAD,
+    'orenda_member':              ROLES.ORENDA_MEMBER,
+    'past_employee':              ROLES.PAST_EMPLOYEE,
+    'alumni':                     ROLES.PAST_EMPLOYEE,
   };
-  return map[role.toLowerCase()] ?? null;
+  
+  return map[input] ?? null;
 }
 
 module.exports = { ROLES, VALID_ROLES, normalizeRole };

@@ -57,3 +57,7 @@ export async function getPendingUsers(): Promise<PendingUser[]> {
 export async function approveUser(userId: string): Promise<void> {
   await api.post('/admin/approve-user', { userId })
 }
+
+export async function finishInternship(internId: string): Promise<void> {
+  await api.post('/admin/finish-internship', { internId })
+}

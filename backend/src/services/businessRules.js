@@ -111,7 +111,9 @@ async function validateTaskCreation({ complexity, deadline, planeTaskId, internI
  *  4. internId matches the task's assigned intern
  *  5. A review for this task does not already exist
  */
-async function validateReviewSubmission({ taskId, internId, qualityScore, timelinessScore, independenceScore }) {
+async function validateReviewSubmission({ taskId, internId, qualityScore, timelinessScore, independenceScore, user }) {
+  const { ROLES } = require('../constants/roles');
+
   // 1. All scores must be integers 1–5
   const scores = { qualityScore, timelinessScore, independenceScore };
   for (const [field, value] of Object.entries(scores)) {
@@ -132,6 +134,17 @@ async function validateReviewSubmission({ taskId, internId, qualityScore, timeli
       status:  404,
       message: `Task with id "${taskId}" does not exist`,
     };
+  }
+
+  // Role-based limited check: Operations Program Manager can only review operational tasks
+  if (user && user.role === ROLES.OPERATIONS_PROGRAM_MANAGER) {
+    if (!task.isOperational) {
+      return {
+        ok:      false,
+        status:  403,
+        message: 'Operations Program Manager can only review operational tasks',
+      };
+    }
   }
 
   // 3. Task must be completed
@@ -289,7 +302,9 @@ function validateAvailabilitySubmission({ maxFreeBlockHours, weekStart, weekEnd,
  *  3. task is not already assigned to this intern (duplicate assignment)
  *  4. task is not already completed
  */
-async function validateTaskAssignment({ internId, taskId }) {
+async function validateTaskAssignment({ internId, taskId, user }) {
+  const { ROLES } = require('../constants/roles');
+  
   // 1. Intern must exist
   const intern = await prisma.intern.findUnique({ where: { id: internId } });
   if (!intern) {
@@ -308,6 +323,17 @@ async function validateTaskAssignment({ internId, taskId }) {
       status:  404,
       message: `Task with id "${taskId}" does not exist`,
     };
+  }
+
+  // Role-based limited check: Collaborator Lead can only assign collaborator-linked tasks
+  if (user && user.role === ROLES.COLLABORATOR_LEAD) {
+    if (!task.collaboratorIds.includes(user.id)) {
+      return {
+        ok:      false,
+        status:  403,
+        message: 'Collaborator Lead can only assign tasks they are linked to as a collaborator',
+      };
+    }
   }
 
   // 3. Prevent duplicate assignment — task already assigned to this intern

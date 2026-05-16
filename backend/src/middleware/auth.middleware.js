@@ -51,10 +51,10 @@ function verifyToken(req, res, next) {
  *
  * @example
  * // Single role
- * router.post('/create-task', verifyToken, requireRole(ROLES.ADMIN), createTask)
+ * router.post('/create-task', verifyToken, requireRole(ROLES.CORE_ADMIN), createTask)
  *
  * // Multiple roles (any of these may access the route)
- * router.get('/report', verifyToken, requireRole(ROLES.ADMIN, ROLES.TEAM_LEAD), getReport)
+ * router.get('/report', verifyToken, requireRole(ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD), getReport)
  */
 function requireRole(...roles) {
   // Validate at startup — catch typos before any request is made

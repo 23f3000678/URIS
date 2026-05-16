@@ -1,14 +1,27 @@
 const express = require('express');
 const router  = express.Router();
-const { getTasksOverview, getTasks, createTask, internUpdateTask } = require('../controllers/tasks.controller');
+const { getTasksOverview, getTasks, createTask, internUpdateTask, deleteTask, getTaskById } = require('../controllers/tasks.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { validate }                 = require('../middleware/validate.middleware');
 const { schemas }                  = require('../validation/schemas');
 const { ROLES } = require('../constants/roles');
 
-router.get('/overview',        verifyToken, requireRole(ROLES.ADMIN),                               getTasksOverview);
+const ADMIN_ROLES = [
+  ROLES.CORE_ADMIN, 
+  ROLES.TECHNICAL_LEAD, 
+  ROLES.OPERATIONS_LEAD, 
+  ROLES.RESEARCH_LEAD,
+  ROLES.OPERATIONS_PROGRAM_MANAGER,
+  ROLES.OBSERVER_TEAM_LEAD,
+  ROLES.COLLABORATOR_LEAD
+];
+const INTERN_ROLES = [ROLES.TECHNICAL_INTERN, ROLES.OPERATIONS_INTERN, ROLES.RESEARCH_INTERN];
+
+router.get('/overview',        verifyToken, requireRole(...ADMIN_ROLES), getTasksOverview);
 router.get('/',                verifyToken, validate(schemas.getTasks),                             getTasks);
-router.post('/create',         verifyToken, requireRole(ROLES.ADMIN), validate(schemas.createTask), createTask);
-router.patch('/:taskId/progress', verifyToken, requireRole(ROLES.INTERN), validate(schemas.internUpdateTask), internUpdateTask);
+router.get('/:taskId',         verifyToken, getTaskById);
+router.post('/create',         verifyToken, requireRole(ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD, ROLES.RESEARCH_LEAD, ROLES.COLLABORATOR_LEAD), validate(schemas.createTask), createTask);
+router.patch('/:taskId/progress', verifyToken, requireRole(...INTERN_ROLES), validate(schemas.internUpdateTask), internUpdateTask);
+router.delete('/:taskId',      verifyToken, requireRole(ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD, ROLES.RESEARCH_LEAD), deleteTask);
 
 module.exports = router;

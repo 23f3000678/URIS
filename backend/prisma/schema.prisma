@@ -15,8 +15,18 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 enum Role {
-  INTERN
-  ADMIN
+  CORE_ADMIN
+  TECHNICAL_LEAD
+  OPERATIONS_LEAD
+  RESEARCH_LEAD
+  OPERATIONS_PROGRAM_MANAGER
+  TECHNICAL_INTERN
+  OPERATIONS_INTERN
+  RESEARCH_INTERN
+  OBSERVER_TEAM_LEAD
+  COLLABORATOR_LEAD
+  ORENDA_MEMBER
+  PAST_EMPLOYEE
 }
 
 // ---------------------------------------------------------------------------
@@ -28,8 +38,8 @@ model User {
   email     String     @unique
   password  String     // bcrypt hash only — never plain text
   name      String     @default("")   // display name supplied at registration
-  role      Role       @default(INTERN)
-  status    String     @default("active")  // "active" | "pending" (admin registrations await approval)
+  role      Role       @default(TECHNICAL_INTERN)
+  status    String     @default("active")  // "active" | "pending" | "alumni"
   createdAt DateTime   @default(now())
   intern    Intern?
   teams     UserTeam[]
@@ -39,10 +49,17 @@ model Intern {
   id                String            @id @default(uuid())
   userId            String?           @unique
   user              User?             @relation(fields: [userId], references: [id])
+  
+  // Public Portfolio Data
+  slug              String?           @unique // for stemonef.com/portfolio/john-doe
+  profilePic        String?
+  contactNumber     String?
+  bio               String?
+  linkedinUrl       String?
+  skills            String[]          @default([])
+  
   overrideScore     Float?
-  reservedUntil     DateTime?         // soft reservation expiry — set on task assignment,
-                                      // cleared when Plane sync confirms the task is active.
-                                      // While active, capacity engine applies a −20 penalty.
+  reservedUntil     DateTime?         // soft reservation expiry
   createdAt         DateTime          @default(now())
   availabilitySlots AvailabilitySlot[]
   tasks             Task[]
@@ -78,6 +95,14 @@ model Task {
   skills        String[]
   deadline      DateTime?
   lastUpdatedAt DateTime
+  deletedAt     DateTime? // Soft delete - tasks removed for wrong assignment etc.
+  
+  // Visibility & Access metadata
+  isOperational Boolean   @default(false)
+  teamId        String?
+  observerIds   String[]  @default([])
+  collaboratorIds String[] @default([])
+
   createdAt     DateTime  @default(now())
 
   intern        Intern    @relation(fields: [internId], references: [id])

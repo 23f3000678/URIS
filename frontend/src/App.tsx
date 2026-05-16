@@ -17,6 +17,8 @@ import Alerts             from './pages/Alerts'
 import AdminOverview      from './pages/AdminOverview'
 import AuditLogs          from './features/admin/AuditLogs'
 import Notifications      from './pages/Notifications'
+import Portfolio          from './pages/Portfolio'
+import PortfolioEdit      from './pages/PortfolioEdit'
 import { useAuthStore, selectIsAuthenticated, selectIsAdmin } from './store/authStore'
 import { useAlertStore } from './store/alertStore'
 
@@ -52,6 +54,7 @@ export default function App() {
           <Route path="/"         element={<Landing />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/portfolio/:slug" element={<Portfolio />} />
 
           {/* Protected — any authenticated user */}
           <Route path="/dashboard"
@@ -62,6 +65,8 @@ export default function App() {
             element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
           <Route path="/notifications"
             element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+          <Route path="/portfolio-edit"
+            element={<ProtectedRoute><PortfolioEdit /></ProtectedRoute>} />
 
           {/* Protected — admin only */}
           <Route path="/review"

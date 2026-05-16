@@ -6,6 +6,8 @@ const { validate }                 = require('../middleware/validate.middleware'
 const { schemas }                  = require('../validation/schemas');
 const { ROLES } = require('../constants/roles');
 
-router.post('/run', verifyToken, requireRole(ROLES.ADMIN), validate(schemas.runDemo), runDemo);
+const ADMIN_ROLES = [ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD, ROLES.OPERATIONS_LEAD, ROLES.RESEARCH_LEAD];
+
+router.post('/run', verifyToken, requireRole(...ADMIN_ROLES), validate(schemas.runDemo), runDemo);
 
 module.exports = router;

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
+import { ChevronRight, Loader2, AlertTriangle, Award } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
+import { finishInternship } from '../services/admin.service'
 import { extractErrorMessage } from '../services/error'
 
 const SKILL_COLORS: Record<string, string> = {
@@ -45,19 +46,31 @@ export default function Team() {
   const [error, setError]     = useState('')
   const [selected, setSelected] = useState<InternRow | null>(null)
 
-  useEffect(() => {
-    async function load(): Promise<void> {
-      try {
-        const data = await getAdminOverview()
-        setTeam(data.interns)
-      } catch (err) {
-        setError(extractErrorMessage(err, 'Failed to load team data.'))
-      } finally {
-        setLoading(false)
-      }
+  const load = async (): Promise<void> => {
+    setLoading(true)
+    try {
+      const data = await getAdminOverview()
+      setTeam(data.interns)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to load team data.'))
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     void load()
   }, [])
+
+  const handleFinish = async (internId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to finish ${name}'s internship? They will be moved to alumni status and lose dashboard access.`)) return
+    try {
+      await finishInternship(internId)
+      await load()
+    } catch (err) {
+      alert(extractErrorMessage(err, 'Failed to finish internship.'))
+    }
+  }
 
   return (
     <div className="min-h-screen bg-navy-950 text-frost">
@@ -159,9 +172,12 @@ export default function Team() {
 
                   <div className="flex items-center justify-between pt-3"
                     style={{ borderTop: '1px solid rgba(201,168,76,0.08)' }}>
-                    <span className="font-body text-xs text-ice/30">
-                      {intern.taskCount} active task{intern.taskCount !== 1 ? 's' : ''}
-                    </span>
+                    <motion.button whileTap={{ scale: 0.95 }}
+                      onClick={(e) => { e.stopPropagation(); handleFinish(intern.id, intern.name) }}
+                      className="nav-label text-[0.5rem] px-2 py-1 rounded-sm transition-all flex items-center gap-1"
+                      style={{ background: 'rgba(201,168,76,0.1)', color: '#c9a84c', border: '1px solid rgba(201,168,76,0.2)' }}>
+                      <Award size={10} /> FINISH INTERNSHIP
+                    </motion.button>
                     <ChevronRight size={12} className="text-gold/30" />
                   </div>
                 </motion.div>

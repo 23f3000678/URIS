@@ -290,4 +290,36 @@ async function setAvailabilityDeadline(req, res, next) {
   }
 }
 
-module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline };
+async function finishInternship(req, res, next) {
+  try {
+    const { internId } = req.body;
+    if (!internId) return validationError(res, 'internId is required');
+
+    const intern = await prisma.intern.findUnique({ 
+      where: { id: internId },
+      include: { user: true }
+    });
+
+    if (!intern) return notFound(res, 'Intern not found');
+
+    // Update user status and role
+    await prisma.user.update({
+      where: { id: intern.userId },
+      data: {
+        status: 'alumni',
+        role: 'PAST_EMPLOYEE'
+      }
+    });
+
+    void logAction(req.user?.id ?? null, 'FINISH_INTERNSHIP', 'INTERN', internId, {
+      internEmail: intern.user.email,
+      internName: intern.user.name,
+    });
+
+    return ok(res, null, `Internship finished for ${intern.user.name}. Access removed.`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship };

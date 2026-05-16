@@ -15,6 +15,7 @@ const allItems = [
   { icon: Bell,            label: 'Alerts',        to: '/alerts',        adminOnly: true,  internOnly: false },
   { icon: ShieldCheck,     label: 'Admin',         to: '/admin',         adminOnly: true,  internOnly: false },
   { icon: ScrollText,      label: 'Audit Logs',    to: '/audit-logs',    adminOnly: true,  internOnly: false },
+  { icon: LayoutDashboard, label: 'Portfolio',     to: '/portfolio-edit', adminOnly: false, internOnly: true  },
 ]
 
 export default function Sidebar() {

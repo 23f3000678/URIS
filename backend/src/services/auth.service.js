@@ -32,9 +32,9 @@ async function register({ name, email, password, role }) {
 
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-  // Admin registrations start as 'pending' — an existing admin must approve them.
-  // Intern registrations are immediately 'active'.
-  const status = prismaRole === 'ADMIN' ? 'pending' : 'active';
+  // Core Admins and Leads start as 'pending' — an existing Core Admin must approve them.
+  // Interns are immediately 'active'.
+  const status = (prismaRole === 'CORE_ADMIN' || prismaRole.includes('LEAD')) ? 'pending' : 'active';
 
   // Derive a display name: use the provided name if non-empty, otherwise fall
   // back to the email prefix so existing behaviour is preserved.
@@ -53,15 +53,23 @@ async function register({ name, email, password, role }) {
     status: user.status,
   });
 
-  // Pending admin accounts: return no token — they cannot log in until approved.
+  // Pending admin/lead accounts: return no token — they cannot log in until approved.
   if (status === 'pending') {
     return { pending: true, user: { email: user.email, role: user.role.toLowerCase() } };
   }
 
-  // Auto-create an Intern record for intern-role users so all intern-scoped
-  // queries (dashboard, tasks, availability, alerts) work immediately after registration.
-  if (prismaRole === 'INTERN') {
-    await prisma.intern.create({ data: { userId: user.id } });
+  // Auto-create an Intern record for intern-role users
+  if (prismaRole.includes('INTERN')) {
+    // Generate a simple slug from name: "John Doe" -> "john-doe"
+    const baseSlug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+
+    await prisma.intern.create({ 
+      data: { 
+        userId: user.id,
+        slug: slug
+      } 
+    });
   }
 
   const token = jwt.sign(
@@ -94,11 +102,18 @@ async function login({ email, password }) {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw invalidErr;
 
-  // Block pending admin accounts from logging in until approved
+  // Block pending accounts
   if (user.status === 'pending') {
-    const pendingErr = new Error('Your admin account is pending approval. Please wait for an existing admin to approve your access.');
+    const pendingErr = new Error('Your account is pending approval. Please wait for a Core Admin to approve your access.');
     pendingErr.status = 403;
     throw pendingErr;
+  }
+
+  // Block alumni (Past Employees) from internal dashboard
+  if (user.status === 'alumni' || user.role === 'PAST_EMPLOYEE') {
+    const alumniErr = new Error('Your internship has concluded. You no longer have access to the internal dashboard.');
+    alumniErr.status = 403;
+    throw alumniErr;
   }
 
   const token = jwt.sign(

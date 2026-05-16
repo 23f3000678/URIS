@@ -1,4 +1,4 @@
-const { syncTasksFromPlane, detectAndMarkStaleTasks, getTasksOverviewForAllInterns } = require('../services/taskService');
+const { syncTasksFromPlane, detectAndMarkStaleTasks, getTasksOverviewForAllInterns, getTaskFilter } = require('../services/taskService');
 const { generateBlockerAlerts } = require('../services/alertService');
 const { validateTaskCreation }  = require('../services/businessRules');
 const { ok, created, validationError, businessError, notFound } = require('../utils/respond');
@@ -15,12 +15,20 @@ async function getTasksOverview(req, res) {
     const staleCount = await detectAndMarkStaleTasks();
     await generateBlockerAlerts();
 
+    const filter = await getTaskFilter(req.user);
     const overview = await getTasksOverviewForAllInterns();
+    
+    // Filter the overview data based on the calculated filter
+    const filteredOverview = overview.filter(item => {
+      // If the user has a filter on internId, apply it
+      if (filter.internId && item.internId !== filter.internId) return false;
+      return true;
+    });
 
     res.json({
       success: true,
       message: `Tasks overview fetched. ${staleCount} stale task(s) detected.`,
-      data: overview
+      data: filteredOverview
     });
   } catch (err) {
     logger.error({ err }, 'getTasksOverview failed');
@@ -28,38 +36,55 @@ async function getTasksOverview(req, res) {
   }
 }
 
+async function getTaskById(req, res, next) {
+  try {
+    const { taskId } = req.params;
+    const { ROLES } = require('../constants/roles');
+    
+    const filter = await getTaskFilter(req.user);
+    filter.id = taskId;
+
+    const task = await prisma.task.findFirst({
+      where: filter,
+      include: {
+        intern: {
+          select: {
+            user: { select: { name: true, email: true } }
+          }
+        }
+      }
+    });
+
+    if (!task) return notFound(res, 'Task not found or access denied');
+
+    // Role-based field masking (LIMITED visibility)
+    if (req.user.role === ROLES.OPERATIONS_LEAD || req.user.role === ROLES.OPERATIONS_PROGRAM_MANAGER) {
+      delete task.complexity;
+      delete task.skills;
+    }
+
+    // "Can See Notes: NO" logic
+    // (Assuming notes might be added to the model or are part of the description)
+    // If we have a 'notes' field, we would delete it here for relevant roles.
+    
+    return ok(res, task);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getTasks(req, res, next) {
   try {
+    const filter = await getTaskFilter(req.user);
     const { status, page = 1, limit = 20 } = req.query;
-    const isAdmin = req.user.role === 'ADMIN';
 
     const paginationErrors = validatePagination({ page, limit, status });
     if (paginationErrors.length > 0) {
       return validationError(res, paginationErrors[0]);
     }
 
-    const filter = {};
-
-    // Status filter — case-insensitive, stored lowercase in DB
+    // Combine role-based filter with request-based status filter
     if (status) filter.status = status.toLowerCase();
-
-    if (!isAdmin) {
-      // Resolve the intern record for this authenticated user.
-      // If no intern record exists (e.g. user registered but onboarding incomplete),
-      // return an empty list — never 404, which would leak existence information.
-      const intern = await prisma.intern.findUnique({ where: { userId: req.user.id } });
-      if (!intern) {
-        return res.status(200).json({
-          success: true,
-          data:    [],
-          meta:    { total: 0, page: parseInt(page), limit: parseInt(limit) },
-        });
-      }
-      // Scope the query strictly to this intern's own tasks.
-      // This filter is always set before the DB query runs — no path exists
-      // where a non-admin can receive another intern's tasks.
-      filter.internId = intern.id;
-    }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -91,13 +116,22 @@ async function getTasks(req, res, next) {
       prisma.task.count({ where: filter }),
     ]);
 
-    // Flatten intern → user → email/name into top-level fields
-    const tasksWithAssignee = tasks.map(t => ({
-      ...t,
-      assignee: t.intern?.user?.name || t.intern?.user?.email || null,
-      deadline: t.deadline ? t.deadline.toISOString().split('T')[0] : null,
-      intern:   undefined,
-    }));
+    // Mask fields for LIMITED roles in list view
+    const { ROLES } = require('../constants/roles');
+    const tasksWithAssignee = tasks.map(t => {
+      const task = {
+        ...t,
+        assignee: t.intern?.user?.name || t.intern?.user?.email || null,
+        deadline: t.deadline ? t.deadline.toISOString().split('T')[0] : null,
+        intern:   undefined,
+      };
+      
+      if (req.user.role === ROLES.OPERATIONS_LEAD || req.user.role === ROLES.OPERATIONS_PROGRAM_MANAGER) {
+        delete task.complexity;
+      }
+      
+      return task;
+    });
 
     logger.info({ count: tasks.length }, 'Tasks fetched');
 
@@ -263,4 +297,26 @@ async function internUpdateTask(req, res, next) {
   }
 }
 
-module.exports = { getTasksOverview, getTasks, createTask, internUpdateTask };
+async function deleteTask(req, res, next) {
+  try {
+    const { taskId } = req.params;
+    const { removeTask } = require('../services/taskService');
+
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task) return notFound(res, 'Task not found');
+
+    await removeTask(taskId);
+
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.DELETE_TASK || 'DELETE_TASK', AUDIT_ENTITIES.TASK, taskId, {
+      taskId,
+      title: task.title,
+      internId: task.internId,
+    });
+
+    return ok(res, null, 'Task removed successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getTasksOverview, getTasks, createTask, internUpdateTask, deleteTask, getTaskById };
