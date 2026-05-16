@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Loader2, Globe, Save, CheckCircle2, User, Linkedin, Phone, Briefcase, Plus, X } from 'lucide-react'
+import { Loader2, Globe, Save, CheckCircle2, User, Phone, Briefcase, Plus, X } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
@@ -124,7 +124,7 @@ export default function PortfolioEdit() {
                   <div>
                     <label className="nav-label text-[0.55rem] text-gold/60 block mb-1.5">LINKEDIN URL</label>
                     <div className="relative">
-                      <Linkedin size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-ice/30" />
+                      <Globe size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-ice/30" />
                       <input className="uris-input pl-9" placeholder="linkedin.com/in/..." value={data?.linkedinUrl || ''}
                         onChange={e => setData(d => d ? { ...d, linkedinUrl: e.target.value } : null)} />
                     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Loader2, Linkedin, Mail, Phone, ExternalLink, Award, Code2, Calendar } from 'lucide-react'
+import { Loader2, Globe, Mail, Phone, ExternalLink, Award, Code2, Calendar } from 'lucide-react'
 import Starfield from '../components/Starfield'
 import api from '../services/api'
 import { extractErrorMessage } from '../services/error'
@@ -104,7 +104,7 @@ export default function Portfolio() {
               className="flex flex-wrap justify-center md:justify-start gap-4">
               {data.linkedinUrl && (
                 <a href={data.linkedinUrl} target="_blank" rel="noopener" className="flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20 transition-all text-sm font-bold">
-                  <Linkedin size={16} /> LINKEDIN
+                  <Globe size={16} /> LINKEDIN
                 </a>
               )}
               <a href={`mailto:${data.email}`} className="flex items-center gap-2 px-6 py-3 rounded-full bg-gold/10 border border-gold/20 text-gold hover:bg-gold/20 transition-all text-sm font-bold">
