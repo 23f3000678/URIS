@@ -128,7 +128,7 @@ async function getAdminOverview(req, res, next) {
       prisma.alert.count({ where: { resolved: false } }),
       prisma.task.count({ where: { status: 'completed', lastUpdatedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } }),
       prisma.intern.findMany({
-        take:    10,
+        take:    100,
         include: {
           user:        { select: { email: true, name: true } },
           credibility: true,
@@ -151,7 +151,7 @@ async function getAdminOverview(req, res, next) {
       prisma.alert.findMany({
         where:   { resolved: false },
         orderBy: { createdAt: 'desc' },
-        take:    10,
+        take:    50,
       }),
     ]);
 

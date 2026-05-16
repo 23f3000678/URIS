@@ -471,7 +471,7 @@ export default function Tasks() {
                                         <label className="nav-label text-[0.55rem] text-ice/40">PROGRESS</label>
                                         <span className="nav-label text-[0.55rem] text-gold">{progressInput}%</span>
                                       </div>
-                                      <input type="range" min={0} max={99} step={1}
+                                      <input type="range" min={0} max={100} step={1}
                                         value={progressInput}
                                         onChange={e => setProgressInput(Number(e.target.value))}
                                         className="w-full h-1 rounded-full cursor-pointer" style={{ accentColor: '#c9a84c' }} />

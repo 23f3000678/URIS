@@ -158,7 +158,7 @@ async function getAvailability(req, res, next) {
         return notFound(res, 'Intern record not found');
       }
 
-      if (intern.id !== parseInt(internId, 10)) {
+      if (intern.id !== internId) {
         return forbidden(res, 'Access denied. You can only view your own availability.');
       }
     }

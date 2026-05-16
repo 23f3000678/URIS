@@ -30,18 +30,42 @@ function computeTotalFreeHours(busyBlocks, maxFreeBlockHours) {
   return freeBlocks * Math.min(maxFreeBlockHours, HOURS_PER_BLOCK);
 }
 
+const DAY_TO_INDEX = {
+  MON: 0, TUE: 1, WED: 2, THU: 3, FRI: 4, SAT: 5, SUN: 6,
+  monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6
+};
+
+/**
+ * Maps busy blocks to a 21-slot week (7 days x 3 slots).
+ * If severity is 'high' (full day), marks all 3 slots of that day as busy.
+ * Otherwise (medium/partial), marks only 1 slot.
+ */
+function mapBlocksToSlots(busyBlocks) {
+  const occupied = new Array(TOTAL_POSSIBLE_BLOCKS).fill(false);
+  for (const block of busyBlocks) {
+    const dayCode = (block.day || '').toUpperCase();
+    const dayIdx = DAY_TO_INDEX[dayCode] ?? DAY_TO_INDEX[block.day?.toLowerCase()];
+    if (dayIdx === undefined) continue;
+
+    const baseIdx = dayIdx * 3;
+    if (block.severity === 'high') {
+      occupied[baseIdx] = true;
+      occupied[baseIdx + 1] = true;
+      occupied[baseIdx + 2] = true;
+    } else {
+      // For partial/medium, we assume they take the afternoon slot (middle)
+      occupied[baseIdx + 1] = true;
+    }
+  }
+  return occupied;
+}
+
 /**
  * Max continuous free block: longest run of consecutive free slots across the week.
- * busyBlocks are expected to have a `day` field (0–6). Each day has 3 slots.
- * We model 21 slots (day*3 + slot) and find the longest free run.
+ * Uses the mapped 21-slot occupancy array to find the true longest run.
  */
 function computeMaxContinuousBlock(busyBlocks, maxFreeBlockHours) {
-  const busySet = new Set(busyBlocks.map((_, i) => i)); // treat each busy block as occupying a slot index
-  // Build a simple 21-slot occupancy array based on busy count (positional)
-  const occupied = new Array(TOTAL_POSSIBLE_BLOCKS).fill(false);
-  for (let i = 0; i < Math.min(busyBlocks.length, TOTAL_POSSIBLE_BLOCKS); i++) {
-    occupied[i] = true;
-  }
+  const occupied = mapBlocksToSlots(busyBlocks);
 
   let maxRun = 0;
   let currentRun = 0;
@@ -54,13 +78,17 @@ function computeMaxContinuousBlock(busyBlocks, maxFreeBlockHours) {
     }
   }
 
-  return maxRun * Math.min(maxFreeBlockHours, HOURS_PER_BLOCK);
+  // Each slot is 2 hours. Cap by maxFreeBlockHours if requested,
+  // but usually maxFreeBlockHours is the intern's self-reported limit.
+  return maxRun * HOURS_PER_BLOCK;
 }
 
 function computeAvailabilityStatus(busyBlocks, fragmentationIndex, weekStatusToggle) {
   if (weekStatusToggle === 'heavy_week' || weekStatusToggle === 'busy') return 'unavailable';
 
-  const busyCount = busyBlocks.length;
+  // We use the 21-slot occupancy for a more accurate count
+  const occupied = mapBlocksToSlots(busyBlocks);
+  const busyCount = occupied.filter(Boolean).length;
 
   if (busyCount >= 14)                             return 'unavailable';
   if (busyCount >= 7 || fragmentationIndex > 0.6)  return 'partial';

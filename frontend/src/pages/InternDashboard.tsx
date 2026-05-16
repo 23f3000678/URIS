@@ -136,10 +136,10 @@ export default function InternDashboard() {
                 {(data?.unreadCount ?? 0) > 0
                   ? <BellRing size={18} className="text-gold" />
                   : <Bell size={18} className="text-ice/40" />}
-                {(data?.unreadCount ?? 0) > 0 && (
+                {data && data.unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold"
                     style={{ background: '#f87171', color: '#fff' }}>
-                    {data!.unreadCount > 9 ? '9+' : data!.unreadCount}
+                    {data.unreadCount > 9 ? '9+' : data.unreadCount}
                   </span>
                 )}
               </motion.button>
