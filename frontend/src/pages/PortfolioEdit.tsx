@@ -89,7 +89,7 @@ export default function PortfolioEdit() {
       <Starfield />
       <Sidebar />
       <main className="md:ml-52 pt-14 min-h-screen relative z-10">
-        <div className="px-4 md:px-8 py-8 max-w-4xl">
+        <div className="px-4 md:px-8 py-8 max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
             <p className="nav-label text-[0.55rem] text-gold/40 tracking-ultra mb-1">PERSONAL BRANDING</p>
             <h1 className="font-display font-black text-3xl text-ice-gradient">Public Portfolio</h1>

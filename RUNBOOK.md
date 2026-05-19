@@ -17,6 +17,7 @@ This document covers everything needed to deploy, operate, and troubleshoot the 
 9. [Database Migrations](#9-database-migrations)
 10. [Graceful Shutdown](#10-graceful-shutdown)
 11. [Common Issues](#11-common-issues)
+12. [Feature Guide & Usage](#12-feature-guide--usage)
 
 ---
 
@@ -298,3 +299,10 @@ UPDATE "Intern" SET "reservedUntil" = NULL WHERE id = '<internId>';
 
 ### Database connection errors
 Check `DATABASE_URL` format: `postgresql://user:password@host:5432/dbname`. Ensure the DB is reachable and the user has `CONNECT` and schema privileges.
+
+---
+
+## 12. Feature Guide & Usage
+
+For a detailed list of all system features (such as Team Heat Capacity, Task Assignment & Overload Warning Banner, Task Deletion, Google Form integration, and Public Portfolios) and how to use them, please refer to [FEATURES.md](file:///c:/Users/DELL/Downloads/New%20folder/PROJECTS/URIS/URIS/FEATURES.md).
+

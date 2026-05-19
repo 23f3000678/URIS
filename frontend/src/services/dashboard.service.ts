@@ -27,6 +27,15 @@ export interface AlertItem {
   severity: 'critical' | 'warning' | 'info'
 }
 
+export interface TeamCapacityRow {
+  id: string
+  name: string
+  capacityScore: number
+  rpi: number
+  internCount: number
+  isBestPerforming: boolean
+}
+
 export interface AdminOverview {
   totalInterns: number
   activeTasks: number
@@ -34,6 +43,7 @@ export interface AdminOverview {
   completedLast30: number
   interns: InternRow[]
   alerts: AlertItem[]
+  teams?: TeamCapacityRow[]
 }
 
 export interface InternAlert {

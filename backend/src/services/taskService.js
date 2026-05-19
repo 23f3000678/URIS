@@ -394,6 +394,32 @@ async function getTaskFilter(user) {
   return filter;
 }
 
+async function generateFormReminders() {
+  const allInterns = await prisma.intern.findMany({
+    select: { id: true, user: { select: { name: true, email: true } } },
+  });
+
+  let created = 0;
+  for (const intern of allInterns) {
+    const internName = intern.user?.name || intern.user?.email?.split('@')[0] || 'Intern';
+    const encodedName = encodeURIComponent(internName);
+    const encodedEmail = encodeURIComponent(intern.user?.email || '');
+    // In a real scenario, this would be a pre-filled Google Form link
+    const formLink = `https://forms.google.com/mock-form?name=${encodedName}&email=${encodedEmail}`;
+    
+    await prisma.alert.create({
+      data: {
+        internId: intern.id,
+        type:     'form_reminder',
+        severity: 'info',
+        message:  `Please fill out your 3-day update form (Tasks, Availability, and Report Attachment): ${formLink}`,
+      },
+    });
+    created++;
+  }
+  return created;
+}
+
 module.exports = { 
   syncTasksFromPlane, 
   syncSingleIssueFromPlane, 
@@ -406,5 +432,6 @@ module.exports = {
   generateDeadlineAlerts, 
   generateAvailabilityReminders,
   generateTaskReminders,
-  getTaskFilter
+  getTaskFilter,
+  generateFormReminders
 };

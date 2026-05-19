@@ -22,6 +22,6 @@ router.get('/',                verifyToken, validate(schemas.getTasks),         
 router.get('/:taskId',         verifyToken, getTaskById);
 router.post('/create',         verifyToken, requireRole(ROLES.CORE_ADMIN, ROLES.OPERATIONS_LEAD, ROLES.OPERATIONS_PROGRAM_MANAGER, ROLES.TECHNICAL_LEAD, ROLES.RESEARCH_LEAD, ROLES.COLLABORATOR_LEAD), validate(schemas.createTask), createTask);
 router.patch('/:taskId/progress', verifyToken, requireRole(...INTERN_ROLES), validate(schemas.internUpdateTask), internUpdateTask);
-router.delete('/:taskId',      verifyToken, requireRole(ROLES.CORE_ADMIN, ROLES.TECHNICAL_LEAD, ROLES.RESEARCH_LEAD), deleteTask);
+router.delete('/:taskId',      verifyToken, requireRole(ROLES.CORE_ADMIN, ROLES.OPERATIONS_LEAD, ROLES.OPERATIONS_PROGRAM_MANAGER, ROLES.TECHNICAL_LEAD, ROLES.RESEARCH_LEAD, ROLES.COLLABORATOR_LEAD), deleteTask);
 
 module.exports = router;

@@ -237,7 +237,73 @@ async function getAdminOverview(req, res, next) {
       };
     });
 
-    return ok(res, { totalInterns, activeTasks, openAlerts, completedLast30, interns, alerts });
+    // Fetch all active UserTeams to map user -> teams
+    const allUserTeams = await prisma.userTeam.findMany({
+      where: { leftAt: null },
+      include: { team: true }
+    });
+
+    // Map of userId -> list of team names/ids
+    const userToTeams = {};
+    for (const ut of allUserTeams) {
+      if (!userToTeams[ut.userId]) {
+        userToTeams[ut.userId] = [];
+      }
+      userToTeams[ut.userId].push({ id: ut.teamId, name: ut.team.name });
+    }
+
+    // Now group the mapped interns by team
+    const teamStatsMap = {};
+    
+    for (const intern of interns) {
+      const origIntern = allInterns.find(ai => ai.id === intern.id);
+      const userId = origIntern?.userId;
+      const teams = (userId && userToTeams[userId]) || [{ id: 'unassigned', name: 'Unassigned' }];
+      
+      for (const t of teams) {
+        if (!teamStatsMap[t.id]) {
+          teamStatsMap[t.id] = {
+            id: t.id,
+            name: t.name,
+            totalCapacity: 0,
+            totalRpi: 0,
+            count: 0
+          };
+        }
+        teamStatsMap[t.id].totalCapacity += intern.capacityScore;
+        teamStatsMap[t.id].totalRpi += intern.rpi;
+        teamStatsMap[t.id].count += 1;
+      }
+    }
+
+    const teamList = Object.values(teamStatsMap).map(t => {
+      const avgCapacity = t.count > 0 ? Math.round(t.totalCapacity / t.count) : 0;
+      const avgRpi = t.count > 0 ? parseFloat((t.totalRpi / t.count).toFixed(1)) : 0;
+      return {
+        id: t.id,
+        name: t.name,
+        capacityScore: avgCapacity,
+        rpi: avgRpi,
+        internCount: t.count
+      };
+    });
+
+    // Determine best performing team based on average RPI
+    let bestTeamId = null;
+    let maxRpi = -1;
+    for (const t of teamList) {
+      if (t.id !== 'unassigned' && t.rpi > maxRpi) {
+        maxRpi = t.rpi;
+        bestTeamId = t.id;
+      }
+    }
+
+    const teams = teamList.map(t => ({
+      ...t,
+      isBestPerforming: t.id === bestTeamId
+    })).sort((a, b) => b.rpi - a.rpi);
+
+    return ok(res, { totalInterns, activeTasks, openAlerts, completedLast30, interns, alerts, teams });
   } catch (err) {
     next(err);
   }

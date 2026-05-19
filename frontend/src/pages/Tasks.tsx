@@ -195,7 +195,7 @@ export default function Tasks() {
       <Starfield />
       <Sidebar />
       <main className="md:ml-52 pt-14 min-h-screen relative z-10">
-        <div className="px-4 md:px-8 py-8">
+        <div className="px-4 md:px-8 py-8 max-w-7xl mx-auto">
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-8">
@@ -670,6 +670,25 @@ export default function Tasks() {
                       <option key={i.id} value={i.id}>{i.name}</option>
                     ))}
                   </select>
+                  {newTask.internId && interns.find(i => i.id === newTask.internId) && (
+                    (() => {
+                      const intern = interns.find(i => i.id === newTask.internId)!;
+                      const isOverloaded = intern.capacityScore < 40 || intern.tli > 5;
+                      if (isOverloaded) {
+                        return (
+                          <div className="mt-2 p-2 rounded-sm" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                            <p className="font-body text-xs text-amber-400/90 flex items-start gap-1.5">
+                              <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                              <span>
+                                <strong>Warning:</strong> This intern is currently overloaded (Capacity: {intern.capacityScore}, TLI: {intern.tli}). They may not be capable of handling this task, but you can still assign it.
+                              </span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()
+                  )}
                 </div>
                 <div>
                   <label className="nav-label text-[0.6rem] text-gold/60 block mb-2">COMPLEXITY (1–5)</label>

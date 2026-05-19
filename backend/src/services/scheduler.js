@@ -29,12 +29,14 @@ const DEFAULT_DIGEST_CRON       = '0 8 * * 1';   // Monday 08:00 UTC
 const DEFAULT_DEADLINE_CRON     = '0 * * * *';   // Every hour
 const DEFAULT_AVAILABILITY_CRON = '0 9 * * 1';   // Monday 09:00 UTC
 const DEFAULT_TASK_REMINDER_CRON = '0 9 * * 0,4'; // Thursday and Sunday 09:00 UTC
+const DEFAULT_FORM_REMINDER_CRON = '0 9 */3 * *'; // Every 3 days at 09:00 UTC
 
 let _syncTask         = null;
 let _digestTask       = null;
 let _deadlineTask     = null;
 let _availabilityTask = null;
 let _taskReminderTask = null;
+let _formReminderTask = null;
 
 function _startSyncJob() {
   const expression = process.env.SYNC_INTERVAL_CRON || DEFAULT_SYNC_CRON;
@@ -107,6 +109,7 @@ function start() {
   _startDeadlineJob();
   _startAvailabilityReminderJob();
   _startTaskReminderJob();
+  _startFormReminderJob();
 }
 
 function stop() {
@@ -115,6 +118,7 @@ function stop() {
   if (_deadlineTask)     { _deadlineTask.stop();     _deadlineTask     = null; }
   if (_availabilityTask) { _availabilityTask.stop(); _availabilityTask = null; }
   if (_taskReminderTask) { _taskReminderTask.stop(); _taskReminderTask = null; }
+  if (_formReminderTask) { _formReminderTask.stop(); _formReminderTask = null; }
   logger.info('All scheduled jobs stopped');
 }
 
@@ -165,6 +169,24 @@ function _startTaskReminderJob() {
       logger.info({ count }, 'generateTaskReminders completed');
     } catch (err) {
       logger.error({ err }, 'generateTaskReminders threw unexpectedly');
+    }
+  });
+}
+
+function _startFormReminderJob() {
+  const expression = process.env.FORM_REMINDER_CRON || DEFAULT_FORM_REMINDER_CRON;
+  if (!cron.validate(expression)) {
+    logger.error({ expression }, 'FORM_REMINDER_CRON is not valid — form reminder job not started');
+    return;
+  }
+  logger.info({ expression }, 'Starting form reminder job');
+  const { generateFormReminders } = require('./taskService');
+  _formReminderTask = cron.schedule(expression, async () => {
+    try {
+      const count = await generateFormReminders();
+      logger.info({ count }, 'generateFormReminders completed');
+    } catch (err) {
+      logger.error({ err }, 'generateFormReminders threw unexpectedly');
     }
   });
 }

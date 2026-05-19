@@ -283,9 +283,8 @@ function AdminCommandDashboard() {
               </div>
             </motion.div>
           </div>
-
-          {/* Heatmap — derived from real intern capacity data */}
-          {data.interns.length > 0 && (
+          {/* Heatmap — derived from real team capacity data */}
+          {((data.teams && data.teams.length > 0) || data.interns.length > 0) && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }} className="glass-card rounded-sm mt-6 p-6">
               <div className="flex items-center justify-between mb-5">
@@ -295,35 +294,82 @@ function AdminCommandDashboard() {
                 </div>
                 <Clock size={13} className="text-gold/40" />
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-                {days.map((day, di) => (
-                  <div key={day}>
-                    <p className="nav-label text-[0.55rem] text-ice/40 text-center mb-2">{day}</p>
-                    <div className="space-y-1">
-                      {data.interns.map((intern, ii) => {
-                        // Derive a per-day variance from the intern's real capacity score
-                        const seed = (di * 7 + ii * 3) % 5
-                        const v = Math.max(15, Math.min(95, intern.capacityScore + (seed - 2) * 12))
-                        return (
-                          <motion.div key={intern.id}
-                            initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
-                            transition={{ delay: 0.7 + di * 0.04 + ii * 0.02 }}
-                            title={`${intern.name}: ${v}`}
-                            className="h-6 rounded-sm cursor-pointer hover:scale-y-110 transition-transform flex items-center justify-center"
-                            style={{ background: `rgba(201,168,76,${v / 100 * 0.5 + 0.05})`, border: '1px solid rgba(201,168,76,0.1)' }}>
-                            <span className="nav-label text-[0.45rem] text-gold/70">{v}</span>
-                          </motion.div>
-                        )
-                      })}
-                    </div>
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {/* Row Labels */}
+                <div className="flex flex-col justify-end">
+                  <div className="h-4 mb-2" /> {/* alignment spacer */}
+                  <div className="space-y-1.5">
+                    {data.teams && data.teams.length > 0 ? (
+                      data.teams.map((team) => (
+                        <div key={team.id} className="h-6 flex items-center pr-3 min-w-[120px]">
+                          <span className={`nav-label text-[0.55rem] truncate ${team.isBestPerforming ? 'text-green-400 font-black' : 'text-ice/60'}`}>
+                            {team.name} {team.isBestPerforming && '👑'}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      data.interns.map((intern) => (
+                        <div key={intern.id} className="h-6 flex items-center pr-3 min-w-[100px]">
+                          <span className="nav-label text-[0.55rem] text-ice/60 truncate">
+                            {intern.name}
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
-                ))}
+                </div>
+
+                {/* Daily Blocks */}
+                <div className="grid grid-cols-5 gap-2 md:gap-3 flex-1 min-w-[300px]">
+                  {days.map((day, di) => (
+                    <div key={day}>
+                      <p className="nav-label text-[0.55rem] text-ice/40 text-center mb-2">{day}</p>
+                      <div className="space-y-1.5">
+                        {data.teams && data.teams.length > 0 ? (
+                          data.teams.map((team, ti) => {
+                            const seed = (di * 7 + ti * 3) % 5
+                            const v = Math.max(15, Math.min(95, team.capacityScore + (seed - 2) * 12))
+                            const isBest = team.isBestPerforming
+                            return (
+                              <motion.div key={team.id}
+                                initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
+                                transition={{ delay: 0.7 + di * 0.04 + ti * 0.02 }}
+                                title={`${team.name}${isBest ? ' (Best Performing Team)' : ''}: ${v}`}
+                                className="h-6 rounded-sm cursor-pointer hover:scale-y-110 transition-transform flex items-center justify-center relative overflow-hidden"
+                                style={{ 
+                                  background: isBest ? `rgba(74,222,128,${v / 100 * 0.6 + 0.15})` : `rgba(201,168,76,${v / 100 * 0.5 + 0.05})`, 
+                                  border: isBest ? '1px solid rgba(74,222,128,0.4)' : '1px solid rgba(201,168,76,0.1)' 
+                                }}>
+                                <span className="nav-label text-[0.45rem] font-bold" style={{ color: isBest ? '#4ade80' : '#c9a84c' }}>{v}</span>
+                              </motion.div>
+                            )
+                          })
+                        ) : (
+                          data.interns.map((intern, ii) => {
+                            const seed = (di * 7 + ii * 3) % 5
+                            const v = Math.max(15, Math.min(95, intern.capacityScore + (seed - 2) * 12))
+                            return (
+                              <motion.div key={intern.id}
+                                initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
+                                transition={{ delay: 0.7 + di * 0.04 + ii * 0.02 }}
+                                title={`${intern.name}: ${v}`}
+                                className="h-6 rounded-sm cursor-pointer hover:scale-y-110 transition-transform flex items-center justify-center"
+                                style={{ background: `rgba(201,168,76,${v / 100 * 0.5 + 0.05})`, border: '1px solid rgba(201,168,76,0.1)' }}>
+                                <span className="nav-label text-[0.45rem] text-gold/70">{v}</span>
+                              </motion.div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="flex items-center gap-4 mt-4 justify-end">
-                {[{ label: 'HIGH', c: 'rgba(201,168,76,0.6)' }, { label: 'MED', c: 'rgba(201,168,76,0.3)' }, { label: 'LOW', c: 'rgba(201,168,76,0.1)' }].map(l => (
+                {[{ label: 'HIGH', c: 'rgba(201,168,76,0.6)' }, { label: 'MED', c: 'rgba(201,168,76,0.3)' }, { label: 'LOW', c: 'rgba(201,168,76,0.1)' }, { label: 'BEST PERFORMING TEAM', c: 'rgba(74,222,128,0.5)' }].map(l => (
                   <div key={l.label} className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-sm" style={{ background: l.c }} />
-                    <span className="nav-label text-[0.5rem] text-ice/30">{l.label}</span>
+                    <span className="nav-label text-[0.55rem] text-ice/30">{l.label}</span>
                   </div>
                 ))}
               </div>
