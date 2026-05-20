@@ -41,7 +41,7 @@ beforeAll(async () => {
       email:    TEST_EMAIL,
       password: 'hashed-placeholder',
       name:     'Integration Test User',
-      role:     'INTERN',
+      role:     'TECHNICAL_INTERN',
     },
   });
   testUserId = user.id;

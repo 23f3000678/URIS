@@ -1,4 +1,5 @@
-import { test, expect, Browser } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import type { Browser } from '@playwright/test';
 import { saveAdminState, ADMIN_STATE_FILE } from '../helpers/storageState';
 
 /**

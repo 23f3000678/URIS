@@ -23,29 +23,7 @@ import { ADMIN_ROLES } from '../constants/roles'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/**
- * UserRole — the full set of role strings the backend can return.
- * Matches the lowercase values in frontend/src/constants/roles.ts.
- *
- * Backward-compat: 'admin' and 'intern' are included so any persisted
- * localStorage sessions from before the role expansion still hydrate cleanly.
- */
-export type UserRole =
-  | 'core_admin'
-  | 'technical_lead'
-  | 'operations_lead'
-  | 'research_lead'
-  | 'operations_program_manager'
-  | 'technical_intern'
-  | 'operations_intern'
-  | 'research_intern'
-  | 'observer_team_lead'
-  | 'collaborator_lead'
-  | 'orenda_member'
-  | 'past_employee'
-  // Legacy values — kept for backward compat with persisted sessions
-  | 'admin'
-  | 'intern'
+export type UserRole = Role
 
 export interface AuthUser {
   id:     string

@@ -43,11 +43,18 @@ interface RoleGuardProps {
 
 export default function RoleGuard({ allow, children, fallback = null }: RoleGuardProps) {
   const user     = useAuthStore(selectUser)
-  const userRole = user?.role as Role | undefined
+  const isAdmin  = useAuthStore(s => s.isAdmin())
+  const userRole = user?.role || ''
+
+  const checkAllowed = (r: Role) => {
+    if (r === 'admin') return isAdmin
+    if (r === 'intern') return userRole.includes('intern') || userRole === 'orenda_member'
+    return userRole === r
+  }
 
   const allowed = Array.isArray(allow)
-    ? (userRole !== undefined && allow.includes(userRole))
-    : userRole === allow
+    ? allow.some(checkAllowed)
+    : checkAllowed(allow)
 
   return allowed ? <>{children}</> : <>{fallback}</>
 }

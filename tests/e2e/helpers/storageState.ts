@@ -15,7 +15,7 @@
  *   });
  */
 
-import { Browser } from '@playwright/test';
+import type { Browser } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';

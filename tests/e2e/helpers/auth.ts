@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 // ── Seed credentials (password: 123456 for all) ───────────────────────────────
 export const ADMIN_EMAIL  = 'admin@uris.com';

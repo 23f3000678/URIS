@@ -33,7 +33,7 @@
 
 import { Navigate } from 'react-router-dom'
 import { useAuthStore, selectIsAuthenticated, selectUser } from '../store/authStore'
-import { ROLES, type Role } from '../constants/roles'
+import { type Role } from '../constants/roles'
 
 interface ProtectedRouteProps {
   children:    React.ReactNode
@@ -57,6 +57,7 @@ export default function ProtectedRoute({
   const isAuthenticated = useAuthStore(selectIsAuthenticated)
   const user            = useAuthStore(selectUser)
   const token           = useAuthStore(s => s.token)
+  const isAdmin         = useAuthStore(s => s.isAdmin())
 
   // Not logged in → send to login
   // Check both isAuthenticated and token directly to handle the Zustand
@@ -66,13 +67,20 @@ export default function ProtectedRoute({
     return <Navigate to="/login" replace />
   }
 
-  // Resolve the effective allowed roles
-  const effectiveRoles: Role[] = allowRoles ?? (adminOnly ? [ROLES.ADMIN] : [])
+  // If adminOnly restriction is set, check if the user is an admin
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/dashboard" replace />
+  }
 
-  // If a role restriction is set, enforce it
-  if (effectiveRoles.length > 0) {
-    const userRole = user?.role as Role | undefined
-    if (!userRole || !effectiveRoles.includes(userRole)) {
+  // If a specific list of roles is allowed, enforce it
+  if (allowRoles && allowRoles.length > 0) {
+    const userRole = user?.role || ''
+    const isAllowed = allowRoles.some(r => {
+      if (r === 'admin') return isAdmin
+      if (r === 'intern') return userRole.includes('intern') || userRole === 'orenda_member'
+      return userRole === r
+    })
+    if (!isAllowed) {
       return <Navigate to="/dashboard" replace />
     }
   }
