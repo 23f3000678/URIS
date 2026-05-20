@@ -14,7 +14,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: true,
     canAssign: 'YES',
     canReview: 'YES',
-    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/admin', '/audit-logs']
+    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/admin', '/intelligence', '/governance', '/audit-logs']
   },
   'operations_lead': {
     canSeeAllTasks: 'LIMITED',
@@ -22,7 +22,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'YES',
     canReview: 'NO',
-    modules: ['/dashboard', '/tasks', '/team', '/alerts']
+    modules: ['/dashboard', '/tasks', '/team', '/alerts', '/intelligence']
   },
   'technical_lead': {
     canSeeAllTasks: 'OWN_TEAM',
@@ -30,7 +30,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: true,
     canAssign: 'YES',
     canReview: 'YES',
-    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts']
+    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/intelligence']
   },
   'research_lead': {
     canSeeAllTasks: 'OWN_TEAM',
@@ -38,7 +38,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: true,
     canAssign: 'YES',
     canReview: 'YES',
-    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts']
+    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/intelligence']
   },
   'operations_program_manager': {
     canSeeAllTasks: 'OPERATIONAL',
@@ -46,7 +46,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'YES',
     canReview: 'LIMITED',
-    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts']
+    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/intelligence']
   },
   'technical_intern': {
     canSeeAllTasks: 'NO',
@@ -54,7 +54,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/availability', '/tasks', '/notifications', '/portfolio-edit']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit']
   },
   'operations_intern': {
     canSeeAllTasks: 'NO',
@@ -62,7 +62,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/availability', '/tasks', '/notifications', '/portfolio-edit']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit']
   },
   'research_intern': {
     canSeeAllTasks: 'NO',
@@ -70,7 +70,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/availability', '/tasks', '/notifications', '/portfolio-edit']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit']
   },
   'orenda_member': {
     canSeeAllTasks: 'NO',
@@ -78,7 +78,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/availability', '/tasks', '/notifications', '/portfolio-edit']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit']
   },
   'observer_team_lead': {
     canSeeAllTasks: 'OBSERVED',

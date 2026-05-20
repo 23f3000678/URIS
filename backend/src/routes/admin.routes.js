@@ -1,6 +1,20 @@
 const express = require('express');
 const router  = express.Router();
-const { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship } = require('../controllers/admin.controller');
+const {
+  overrideScore,
+  updateTaskStatus,
+  getAdminOverview,
+  getPendingUsers,
+  approveUser,
+  getAvailabilityDeadline,
+  setAvailabilityDeadline,
+  finishInternship,
+  blockIP,
+  unblockIP,
+  listBlockedIPs,
+  getLoginLogs,
+  changeUserRole,
+} = require('../controllers/admin.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { validate }                 = require('../middleware/validate.middleware');
 const { schemas }                  = require('../validation/schemas');
@@ -24,5 +38,12 @@ router.post('/approve-user',            verifyToken, requireRole(...ADMIN_ROLES)
 router.get('/availability-deadline',    verifyToken,                                                                   getAvailabilityDeadline);
 router.post('/availability-deadline',   verifyToken, requireRole(...ADMIN_ROLES),                                     setAvailabilityDeadline);
 router.post('/finish-internship',       verifyToken, requireRole(...ADMIN_ROLES),                                     finishInternship);
+
+// ── Phase 2: Security & Governance (also exposed via /operational) ────────────
+router.post('/block-ip',                verifyToken, requireRole(ROLES.CORE_ADMIN),                                   blockIP);
+router.delete('/block-ip',              verifyToken, requireRole(ROLES.CORE_ADMIN),                                   unblockIP);
+router.get('/blocked-ips',              verifyToken, requireRole(ROLES.CORE_ADMIN),                                   listBlockedIPs);
+router.get('/login-logs',               verifyToken, requireRole(ROLES.CORE_ADMIN),                                   getLoginLogs);
+router.post('/change-role',             verifyToken, requireRole(ROLES.CORE_ADMIN),                                   changeUserRole);
 
 module.exports = router;

@@ -468,10 +468,19 @@ export default function AdminOverview() {
                                 className="flex items-center justify-between p-3 rounded-sm"
                                 style={{ background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.15)' }}>
                                 <div className="min-w-0 flex-1">
-                                  <p className="font-body text-sm text-frost/80 truncate">{u.email}</p>
-                                  <p className="nav-label text-[0.5rem] text-gold/40 mt-0.5">
-                                    ADMIN · {new Date(u.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  <p className="font-body text-sm text-frost/90 truncate font-medium">
+                                    {u.name || u.email.split('@')[0]}
                                   </p>
+                                  <p className="font-body text-xs text-ice/50 truncate">{u.email}</p>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <span className="nav-label text-[0.5rem] px-1.5 py-0.5 rounded-sm"
+                                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
+                                      {u.role.replace(/_/g, ' ')}
+                                    </span>
+                                    <span className="nav-label text-[0.45rem] text-ice/30">
+                                      {new Date(u.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                  </div>
                                 </div>
                                 <motion.button
                                   whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}

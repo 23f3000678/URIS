@@ -91,16 +91,71 @@ async function register({ name, email, password, role }) {
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
-async function login({ email, password }) {
+// Configurable thresholds (env vars allow tuning without code changes)
+const FAILED_LOGIN_THRESHOLD = parseInt(process.env.FAILED_LOGIN_THRESHOLD, 10) || 5;
+const FAILED_LOGIN_WINDOW_MS  = parseInt(process.env.FAILED_LOGIN_WINDOW_MS,  10) || 15 * 60 * 1000; // 15 min
+const IP_BLOCK_DURATION_MS    = parseInt(process.env.IP_BLOCK_DURATION_MS,    10) || 30 * 60 * 1000; // 30 min
+
+/**
+ * Check recent failed logins for an IP and auto-block if threshold exceeded.
+ * Fire-and-forget — never throws, never blocks the login response.
+ *
+ * @param {string} ip
+ */
+async function checkAndAutoBlockIP(ip) {
+  try {
+    if (!ip || ip === '0.0.0.0' || ip === 'unknown') return;
+
+    const windowStart = new Date(Date.now() - FAILED_LOGIN_WINDOW_MS);
+
+    const recentFailures = await prisma.loginLog.count({
+      where: {
+        ipAddress: ip,
+        success:   false,
+        createdAt: { gte: windowStart },
+      },
+    });
+
+    if (recentFailures >= FAILED_LOGIN_THRESHOLD) {
+      const expiresAt = new Date(Date.now() + IP_BLOCK_DURATION_MS);
+
+      // Upsert so repeated failures just refresh the expiry
+      await prisma.blockedIP.upsert({
+        where:  { ipAddress: ip },
+        update: { expiresAt, reason: `Auto-blocked: ${recentFailures} failed logins within ${FAILED_LOGIN_WINDOW_MS / 60000} minutes`, blockedAt: new Date() },
+        create: { ipAddress: ip, expiresAt, reason: `Auto-blocked: ${recentFailures} failed logins within ${FAILED_LOGIN_WINDOW_MS / 60000} minutes` },
+      });
+
+      // Evict from cache so the block takes effect immediately
+      const { invalidateCache } = require('../middleware/ipBlock.middleware');
+      invalidateCache(ip);
+
+      const logger = require('../utils/logger');
+      logger.warn({ ip, recentFailures }, 'IP auto-blocked due to repeated failed logins');
+    }
+  } catch {
+    // Non-fatal — if the DB is unavailable, skip auto-blocking silently
+  }
+}
+
+async function login({ email, password, ip = '0.0.0.0' }) {
   const user = await prisma.user.findUnique({ where: { email } });
 
   const invalidErr = new Error('Invalid email or password.');
   invalidErr.status = 401;
 
-  if (!user) throw invalidErr;
+  if (!user) {
+    void prisma.loginLog.create({ data: { email, ipAddress: ip, success: false } }).catch(() => {});
+    void checkAndAutoBlockIP(ip);
+    throw invalidErr;
+  }
 
   const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw invalidErr;
+  if (!valid) {
+    void prisma.loginLog.create({ data: { email, ipAddress: ip, success: false } }).catch(() => {});
+    void checkAndAutoBlockIP(ip);
+    throw invalidErr;
+  }
 
   // Block pending accounts
   if (user.status === 'pending') {
@@ -132,7 +187,8 @@ async function login({ email, password }) {
     },
   };
 
-  // Fire-and-forget: audit log + activity tracking
+  // Fire-and-forget: login log + audit log + activity tracking
+  void prisma.loginLog.create({ data: { email, ipAddress: ip, success: true } }).catch(() => {});
   void logAction(user.id, AUDIT_ACTIONS.LOGIN, AUDIT_ENTITIES.USER, user.id, {
     email: user.email,
   });

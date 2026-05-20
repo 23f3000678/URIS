@@ -8,6 +8,7 @@ import { useAuthStore, selectUser } from '../store/authStore'
 import { getPermissions } from '../utils/permissions'
 import { extractErrorMessage } from '../services/error'
 
+import TaskWorkflowPanel from '../components/TaskWorkflowPanel'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
 
 const SKILL_COLORS: Record<string, string> = {
@@ -395,6 +396,14 @@ export default function Tasks() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Workflow panel — notes, escalations, timeline */}
+                            <div className="px-5 pb-2">
+                              <TaskWorkflowPanel
+                                taskId={task.id}
+                                isAdmin={permissions.canAssign !== 'NO'}
+                              />
+                            </div>
 
                             {/* Admin controls panel */}
                             {permissions.canAssign !== 'NO' && task.status !== 'completed' && (

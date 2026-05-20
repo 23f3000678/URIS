@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Diamond } from 'lucide-react'
+import { Eye, EyeOff, Diamond, ArrowLeft } from 'lucide-react'
 import Starfield from '../components/Starfield'
 import { authAPI } from '../api/endpoints'
 import { useAuthStore } from '../store/authStore'
@@ -35,6 +35,12 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 relative overflow-hidden">
       <Starfield />
+      {/* Back to Home */}
+      <Link to="/"
+        className="absolute top-4 left-4 z-20 flex items-center gap-1.5 nav-label text-[0.6rem] text-ice/40 hover:text-gold transition-colors">
+        <ArrowLeft size={12} />
+        BACK TO HOME
+      </Link>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%)' }} />
 

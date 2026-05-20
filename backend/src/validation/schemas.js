@@ -85,6 +85,15 @@ const VALID_BLOCKER_TYPES = [
   'api_access', 'dependency', 'unclear_req',
 ];
 
+// Roles that can be self-registered. Admin and lead roles must be
+// created or promoted internally by CORE_ADMIN only.
+const SELF_REGISTERABLE_ROLES = new Set([
+  'TECHNICAL_INTERN',
+  'OPERATIONS_INTERN',
+  'RESEARCH_INTERN',
+  'ORENDA_MEMBER',
+]);
+
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
 const register = Joi.object({
@@ -97,8 +106,9 @@ const register = Joi.object({
       'string.min':   'password must be at least 6 characters',
       'any.required': 'password is required',
     }),
-    role: Joi.string().valid(...VALID_ROLES).default('TECHNICAL_INTERN').messages({
-      'any.only': `role must be one of: ${[...VALID_ROLES].join(', ')}`,
+    name: Joi.string().trim().max(100).optional().allow('', null),
+    role: Joi.string().valid(...SELF_REGISTERABLE_ROLES).default('TECHNICAL_INTERN').messages({
+      'any.only': 'Self-registration is only available for intern roles. Admin and lead accounts are created internally.',
     }),
   }).required(),
   params: Joi.object(),
@@ -191,15 +201,15 @@ const submitAvailability = Joi.object({
         'any.only':     `weekStatusToggle must be one of: ${VALID_WEEK_STATUSES.join(', ')}`,
         'any.required': 'weekStatusToggle is required',
       }),
-    // Design §12.2 — max_free_block_hrs CHECK(1..3)
+    // Design §12.2 — max_free_block_hrs: frontend offers 1–6, backend accepts 1–6
     maxFreeBlockHours: Joi.number()
       .integer()
       .min(1)
-      .max(3)
+      .max(6)
       .required()
       .messages({
-        'number.min':   'maxFreeBlockHours must be between 1 and 3',
-        'number.max':   'maxFreeBlockHours must be between 1 and 3',
+        'number.min':   'maxFreeBlockHours must be between 1 and 6',
+        'number.max':   'maxFreeBlockHours must be between 1 and 6',
         'any.required': 'maxFreeBlockHours is required',
       }),
     busyBlocks: Joi.array()
@@ -596,9 +606,9 @@ const runDemo = Joi.object({
       'any.required': 'busyBlocks is required',
       'array.base':   'busyBlocks must be an array',
     }),
-    maxFreeBlockHours: Joi.number().integer().min(1).max(3).required().messages({
-      'number.min':   'maxFreeBlockHours must be between 1 and 3',
-      'number.max':   'maxFreeBlockHours must be between 1 and 3',
+    maxFreeBlockHours: Joi.number().integer().min(1).max(6).required().messages({
+      'number.min':   'maxFreeBlockHours must be between 1 and 6',
+      'number.max':   'maxFreeBlockHours must be between 1 and 6',
       'any.required': 'maxFreeBlockHours is required',
     }),
     weekStatusToggle: Joi.string().valid(...VALID_WEEK_STATUSES).required().messages({

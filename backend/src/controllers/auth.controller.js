@@ -36,13 +36,14 @@ async function loginUser(req, res, next) {
   try {
     const email    = typeof req.body.email    === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body.password === 'string' ? req.body.password : '';
+    const ip       = req.ip || req.socket?.remoteAddress || '0.0.0.0';
 
     const errors = validateAuth({ email, password });
     if (errors.length > 0) {
       return validationError(res, errors[0]);
     }
 
-    const result = await login({ email, password });
+    const result = await login({ email, password, ip });
 
     return ok(res, result, 'Login successful.');
   } catch (err) {

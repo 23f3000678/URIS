@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Diamond } from 'lucide-react'
+import { Diamond, ArrowLeft } from 'lucide-react'
 import Starfield from '../components/Starfield'
 import { authAPI } from '../api/endpoints'
 import { useAuthStore } from '../store/authStore'
@@ -44,6 +44,12 @@ export default function Register() {
     return (
       <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 relative overflow-hidden">
         <Starfield />
+        {/* Back to Home */}
+        <Link to="/"
+          className="absolute top-4 left-4 z-20 flex items-center gap-1.5 nav-label text-[0.6rem] text-ice/40 hover:text-gold transition-colors">
+          <ArrowLeft size={12} />
+          BACK TO HOME
+        </Link>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
           className="relative z-10 w-full max-w-md">
           <div className="glass-card rounded-sm p-10 text-center">
@@ -76,6 +82,12 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 relative overflow-hidden">
       <Starfield />
+      {/* Back to Home */}
+      <Link to="/"
+        className="absolute top-4 left-4 z-20 flex items-center gap-1.5 nav-label text-[0.6rem] text-ice/40 hover:text-gold transition-colors">
+        <ArrowLeft size={12} />
+        BACK TO HOME
+      </Link>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%)' }} />
 
@@ -114,24 +126,14 @@ export default function Register() {
                 value={form.role}
                 onChange={e => update('role', e.target.value)}
               >
-                <optgroup label="Admins">
-                  <option value="CORE_ADMIN">Core Admin</option>
-                </optgroup>
-                <optgroup label="Leads & Managers">
-                  <option value="OPERATIONS_PROGRAM_MANAGER">Operations Program Manager</option>
-                  <option value="TECHNICAL_LEAD">Technical Lead</option>
-                  <option value="OPERATIONS_LEAD">Operations Lead</option>
-                  <option value="RESEARCH_LEAD">Research Lead</option>
-                  <option value="OBSERVER_TEAM_LEAD">Observer Team Lead</option>
-                  <option value="COLLABORATOR_LEAD">Collaborator Lead</option>
-                </optgroup>
-                <optgroup label="Interns">
-                  <option value="TECHNICAL_INTERN">Technical Intern</option>
-                  <option value="OPERATIONS_INTERN">Operations Intern</option>
-                  <option value="RESEARCH_INTERN">Research Intern</option>
-                  <option value="ORENDA_MEMBER">Orenda Member</option>
-                </optgroup>
+                <option value="TECHNICAL_INTERN">Technical Intern</option>
+                <option value="RESEARCH_INTERN">Research Intern</option>
+                <option value="OPERATIONS_INTERN">Operations Intern</option>
+                <option value="ORENDA_MEMBER">Orenda Member</option>
               </select>
+              <p className="nav-label text-[0.5rem] text-ice/25 mt-1.5">
+                Admin and lead accounts are created internally by Core Admin.
+              </p>
             </div>
 
             {error && (

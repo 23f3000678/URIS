@@ -55,7 +55,6 @@ async function getReviewForTask(req, res, next) {
     const task = await prisma.task.findUnique({ where: { id: taskId } });
     if (!task) return notFound(res, 'Task not found');
     if (task.internId !== intern.id) {
-      const { forbidden } = require('../utils/respond');
       return forbidden(res, 'You can only view reviews for your own tasks');
     }
 

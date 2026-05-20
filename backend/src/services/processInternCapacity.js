@@ -46,7 +46,6 @@ async function processInternCapacity({
         where: {
           internId,
           createdAt: { gte: getRpiWindowStart() },
-          task: { deletedAt: null }
         },
       });
       const { performanceIndex: computed } = computePerformanceIndex(reviews);

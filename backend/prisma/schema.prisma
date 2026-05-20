@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider   = "prisma-client-js"
   engineType = "binary"
@@ -10,74 +8,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
-
-enum Role {
-  CORE_ADMIN
-  TECHNICAL_LEAD
-  OPERATIONS_LEAD
-  RESEARCH_LEAD
-  OPERATIONS_PROGRAM_MANAGER
-  TECHNICAL_INTERN
-  OPERATIONS_INTERN
-  RESEARCH_INTERN
-  OBSERVER_TEAM_LEAD
-  COLLABORATOR_LEAD
-  ORENDA_MEMBER
-  PAST_EMPLOYEE
-}
-
-// ---------------------------------------------------------------------------
-// Models
-// ---------------------------------------------------------------------------
-
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String     // bcrypt hash only — never plain text
-  name      String     @default("")   // display name supplied at registration
-  role      Role       @default(TECHNICAL_INTERN)
-  status    String     @default("active")  // "active" | "pending" | "alumni"
-  createdAt DateTime   @default(now())
-  intern    Intern?
-  teams     UserTeam[]
+  id         String     @id @default(uuid())
+  email      String     @unique
+  password   String
+  role       Role       @default(TECHNICAL_INTERN)
+  createdAt  DateTime   @default(now())
+  status     String     @default("active")
+  name       String     @default("")
+  activities Activity[]
+  auditLogs  AuditLog[]
+  intern     Intern?
+  teams      UserTeam[]
 }
 
 model Intern {
-  id                String            @id @default(uuid())
-  userId            String?           @unique
-  user              User?             @relation(fields: [userId], references: [id])
-  
-  // Public Portfolio Data
-  slug              String?           @unique // for stemonef.com/portfolio/john-doe
-  profilePic        String?
-  contactNumber     String?
-  bio               String?
-  linkedinUrl       String?
-  skills            String[]          @default([])
-  
+  id                String             @id @default(uuid())
+  userId            String?            @unique
+  createdAt         DateTime           @default(now())
   overrideScore     Float?
-  reservedUntil     DateTime?         // soft reservation expiry
-  createdAt         DateTime          @default(now())
+  reservedUntil     DateTime?
+  skillTags         String[]           @default([])
   availabilitySlots AvailabilitySlot[]
-  tasks             Task[]
-  credibility       CredibilityScore?
   capacityScore     CapacityScore?
+  credibility       CredibilityScore?
+  user              User?              @relation(fields: [userId], references: [id])
+  digests           InternDigest[]
   reviews           Review[]
   scoreHistory      ScoreHistory[]
+  syncLogs          SyncLog[]
+  tasks             Task[]
 }
 
 model AvailabilitySlot {
   id                String   @id @default(uuid())
   internId          String
-  intern            Intern   @relation(fields: [internId], references: [id])
   weekStart         DateTime @db.Date
   weekEnd           DateTime @db.Date
   maxFreeBlockHours Decimal
   busyBlocks        Json
   submittedAt       DateTime @default(now()) @updatedAt
+  intern            Intern   @relation(fields: [internId], references: [id])
 
   @@unique([internId, weekStart])
 }
@@ -95,18 +66,10 @@ model Task {
   skills        String[]
   deadline      DateTime?
   lastUpdatedAt DateTime
-  deletedAt     DateTime? // Soft delete - tasks removed for wrong assignment etc.
-  
-  // Visibility & Access metadata
-  isOperational Boolean   @default(false)
-  teamId        String?
-  observerIds   String[]  @default([])
-  collaboratorIds String[] @default([])
-
   createdAt     DateTime  @default(now())
-
-  intern        Intern    @relation(fields: [internId], references: [id])
+  alerts        Alert[]
   reviews       Review[]
+  intern        Intern    @relation(fields: [internId], references: [id])
 }
 
 model CredibilityScore {
@@ -117,7 +80,6 @@ model CredibilityScore {
   throughputAccuracy Float
   score              Float
   computedAt         DateTime @default(now())
-
   intern             Intern   @relation(fields: [internId], references: [id])
 }
 
@@ -130,21 +92,20 @@ model CapacityScore {
   finalCapacity Float
   capacityLabel String
   updatedAt     DateTime @default(now())
-
   intern        Intern   @relation(fields: [internId], references: [id])
 }
 
 model Review {
   id         String   @id @default(uuid())
   internId   String
-  intern     Intern   @relation(fields: [internId], references: [id])
-  taskId     String?
-  task       Task?    @relation(fields: [taskId], references: [id])
   quality    Float
   timeliness Float
   initiative Float
   complexity Float
   createdAt  DateTime @default(now())
+  taskId     String?
+  intern     Intern   @relation(fields: [internId], references: [id])
+  task       Task?    @relation(fields: [taskId], references: [id])
 
   @@index([taskId])
 }
@@ -155,11 +116,13 @@ model Alert {
   type      String
   taskId    String?
   message   String
-  severity  String   @default("warning")  // "warning" | "critical"
   resolved  Boolean  @default(false)
   createdAt DateTime @default(now())
+  severity  String   @default("warning")
+  task      Task?    @relation(fields: [taskId], references: [id])
 
   @@index([internId])
+  @@index([internId, resolved])
   @@index([severity])
   @@index([resolved])
 }
@@ -167,24 +130,24 @@ model Alert {
 model ScoreHistory {
   id        String   @id @default(uuid())
   internId  String
-  intern    Intern   @relation(fields: [internId], references: [id])
   score     Float
-  type      String   // "performance" | "credibility" | "capacity"
+  type      String
   createdAt DateTime @default(now())
+  intern    Intern   @relation(fields: [internId], references: [id])
+
+  @@index([createdAt])
+  @@index([internId, type, createdAt(sort: Desc)])
 }
 
 model SyncLog {
   id        String   @id @default(uuid())
   internId  String?
   filename  String
-  status    String   @default("SUCCESS") // "SUCCESS" | "FAILED"
+  status    String   @default("SUCCESS")
   error     String?
   createdAt DateTime @default(now())
+  intern    Intern?  @relation(fields: [internId], references: [id])
 }
-
-// ---------------------------------------------------------------------------
-// Multi-Team Support
-// ---------------------------------------------------------------------------
 
 model Team {
   id          String     @id @default(uuid())
@@ -198,46 +161,39 @@ model UserTeam {
   id       String    @id @default(uuid())
   userId   String
   teamId   String
-  role     String    @default("member")  // "member" | "lead"
+  role     String    @default("member")
   joinedAt DateTime  @default(now())
-  leftAt   DateTime?                     // null = currently active member
-
-  user     User      @relation(fields: [userId], references: [id])
+  leftAt   DateTime?
   team     Team      @relation(fields: [teamId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([teamId])
   @@index([leftAt])
 }
 
-// ---------------------------------------------------------------------------
-// Activity Tracking
-// ---------------------------------------------------------------------------
-
 model Activity {
   id        String   @id @default(uuid())
-  userId    String                        // always set — activity is user-specific
-  type      String                        // ACTIVITY_TYPES constant: LOGIN, LOGOUT, TASK_WORK, IDLE
-  duration  Int?                          // seconds; null for point-in-time events (LOGIN/LOGOUT)
+  userId    String
+  type      String
+  duration  Int?
   timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([type])
   @@index([timestamp])
 }
 
-// ---------------------------------------------------------------------------
-// Audit Log
-// ---------------------------------------------------------------------------
-
 model AuditLog {
   id        String   @id @default(uuid())
-  userId    String?                      // null for system-generated events
-  action    String                       // e.g. "LOGIN", "CREATE_TASK"
-  entity    String                       // e.g. "USER", "TASK", "SCORE"
-  entityId  String?                      // id of the affected record
-  metadata  Json?                        // arbitrary extra context
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
   createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([action])
@@ -245,35 +201,111 @@ model AuditLog {
   @@index([createdAt])
 }
 
-// ---------------------------------------------------------------------------
-// System Config
-// ---------------------------------------------------------------------------
-
 model Config {
-  key       String   @id                 // unique setting name, e.g. "availabilityDeadline"
-  value     Json                         // arbitrary JSON value
+  key       String   @id
+  value     Json
   updatedAt DateTime @default(now()) @updatedAt
 }
 
-// ---------------------------------------------------------------------------
-// Weekly Digest
-// ---------------------------------------------------------------------------
-// One row per intern per week. Written by the digest scheduler every Monday.
-// Provides a point-in-time snapshot for trend analysis and admin review.
+model ApprovalRequest {
+  id            String    @id @default(uuid())
+  action        String
+  targetId      String
+  targetType    String
+  requestedById String
+  payload       Json
+  status        String    @default("pending")
+  reviewedById  String?
+  reviewNote    String?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model BlockedIP {
+  id          String    @id @default(uuid())
+  ipAddress   String    @unique
+  reason      String?
+  expiresAt   DateTime?
+  blockedById String?
+  blockedAt   DateTime  @default(now())
+
+  @@index([ipAddress])
+}
+
+model LoginLog {
+  id        String   @id @default(uuid())
+  email     String
+  ipAddress String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([ipAddress])
+  @@index([success])
+  @@index([createdAt])
+}
+
+model UserRoleHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  previousRole String
+  newRole      String
+  changedById  String?
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ArchivedUser {
+  id           String   @id @default(uuid())
+  originalId   String   @unique
+  snapshot     Json
+  status       String   @default("ARCHIVED")
+  archivedAt   DateTime @default(now())
+  archivedById String?
+
+  @@index([status])
+  @@index([archivedAt])
+}
 
 model InternDigest {
   id               String   @id @default(uuid())
   internId         String
-  weekStart        DateTime @db.Date      // Monday of the digest week
-  capacityScore    Float                  // snapshot from ScoreHistory
-  credibilityScore Float                  // snapshot from CredibilityScore
-  performanceIndex Float                  // rolling RPI at time of digest
+  weekStart        DateTime @db.Date
+  capacityScore    Float
+  credibilityScore Float
+  performanceIndex Float
   activeTasks      Int
   completedTasks   Int
   openAlerts       Int
   generatedAt      DateTime @default(now())
+  intern           Intern   @relation(fields: [internId], references: [id], onDelete: Cascade)
 
   @@unique([internId, weekStart])
   @@index([internId])
   @@index([weekStart])
+}
+
+enum Role {
+  CORE_ADMIN
+  TECHNICAL_LEAD
+  OPERATIONS_LEAD
+  RESEARCH_LEAD
+  OPERATIONS_PROGRAM_MANAGER
+  TECHNICAL_INTERN
+  OPERATIONS_INTERN
+  RESEARCH_INTERN
+  OBSERVER_TEAM_LEAD
+  COLLABORATOR_LEAD
+  ORENDA_MEMBER
+  PAST_EMPLOYEE
 }

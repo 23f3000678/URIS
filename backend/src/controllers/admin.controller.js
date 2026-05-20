@@ -314,7 +314,7 @@ async function getPendingUsers(req, res, next) {
   try {
     const users = await prisma.user.findMany({
       where:   { status: 'pending' },
-      select:  { id: true, email: true, role: true, createdAt: true },
+      select:  { id: true, name: true, email: true, role: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     });
     return ok(res, users, 'Pending users fetched');

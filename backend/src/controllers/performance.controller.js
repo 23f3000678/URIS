@@ -4,10 +4,22 @@ const { uploadToNextcloud } = require('../services/storage.service');
 const { saveScoreHistory } = require('../services/scoreHistory.service');
 const { ok, notFound, forbidden } = require('../utils/respond');
 const logger = require('../utils/logger');
+const { ROLES } = require('../constants/roles');
+
+// Roles that can view any intern's performance (not just their own)
+const ADMIN_ROLES = new Set([
+  ROLES.CORE_ADMIN,
+  ROLES.TECHNICAL_LEAD,
+  ROLES.OPERATIONS_LEAD,
+  ROLES.RESEARCH_LEAD,
+  ROLES.OPERATIONS_PROGRAM_MANAGER,
+  ROLES.OBSERVER_TEAM_LEAD,
+  ROLES.COLLABORATOR_LEAD,
+]);
 
 async function getPerformance(req, res, next) {
   try {
-    const isAdmin = req.user.role === 'ADMIN';
+    const isAdmin = ADMIN_ROLES.has(req.user.role);
 
     let internId;
 

@@ -22,7 +22,6 @@ async function getPublicPortfolio(req, res, next) {
         tasks: {
           where: { 
             status: 'completed',
-            deletedAt: null 
           },
           select: {
             id: true,

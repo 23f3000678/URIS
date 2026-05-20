@@ -5,15 +5,15 @@ const helmet  = require('helmet');
 const logger  = require('./src/utils/logger');
 const { apiLimiter } = require('./src/middleware/rateLimit.middleware');
 
-const availabilityRoutes = require('./src/routes/availabilityRoutes');
-const assignmentRoutes   = require('./src/routes/assignmentRoutes');
-const demoRoutes         = require('./src/routes/demoRoutes');
-const authRoutes         = require('./src/routes/authRoutes');
-const taskRoutes         = require('./src/routes/taskRoutes');
-const credibilityRoutes  = require('./src/routes/credibilityRoutes');
-const alertRoutes        = require('./src/routes/alertRoutes');
-const reviewRoutes       = require('./src/routes/reviewRoutes');
-const performanceRoutes  = require('./src/routes/performanceRoutes');
+const availabilityRoutes = require('./src/routes/availability.routes');
+const assignmentRoutes   = require('./src/routes/assignment.routes');
+const demoRoutes         = require('./src/routes/demo.routes');
+const authRoutes         = require('./src/routes/auth.routes');
+const taskRoutes         = require('./src/routes/task.routes');
+const credibilityRoutes  = require('./src/routes/credibility.routes');
+const alertRoutes        = require('./src/routes/alert.routes');
+const reviewRoutes       = require('./src/routes/review.routes');
+const performanceRoutes  = require('./src/routes/performance.routes');
 const adminRoutes        = require('./src/routes/admin.routes');
 const scoreRoutes        = require('./src/routes/score.routes');
 const internRoutes       = require('./src/routes/intern.routes');
@@ -22,13 +22,28 @@ const auditLogRoutes     = require('./src/routes/auditLog.routes');
 const activityRoutes     = require('./src/routes/activity.routes');
 const teamRoutes         = require('./src/routes/team.routes');
 
+const portfolioRoutes    = require('./src/routes/portfolio.routes.js');
+const analyticsRoutes    = require('./src/routes/analytics.routes');
+const governanceRoutes   = require('./src/routes/governance.routes');
+const workflowRoutes     = require('./src/routes/workflow.routes');
+
 const healthRoutes       = require('./src/routes/health.routes');
 const webhookRoutes      = require('./src/routes/webhook.routes');
-const { errorHandler } = require('./src/middleware/error.middleware');
+const supportRoutes      = require('./src/routes/support.routes');
+const archiveRoutes      = require('./src/routes/archive.routes');
+const operationalRoutes  = require('./src/routes/operational.routes');
+const { errorHandler }   = require('./src/middleware/error.middleware');
+const { ipBlockMiddleware } = require('./src/middleware/ipBlock.middleware');
 
 const app = express();
 
 // ── Production startup guard ──────────────────────────────────────────────────
+// DATABASE_URL must always be set — Prisma will crash with an unhelpful error
+// if it is missing. Check early so the failure message is clear.
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is not set. Server cannot start.');
+}
+
 // In production, FRONTEND_URL must be explicitly set. Falling back to
 // localhost in production would silently open CORS to the wrong origin.
 if (process.env.NODE_ENV === 'production' && !process.env.FRONTEND_URL) {
@@ -69,6 +84,11 @@ app.use('/webhooks', webhookRoutes);
 
 app.use(express.json());
 
+// ── IP block check ────────────────────────────────────────────────────────────
+// Runs after express.json() so req.ip is resolved, but before any route
+// handlers. Degrades gracefully if the BlockedIP table doesn't exist yet.
+app.use(ipBlockMiddleware);
+
 // ── Minimal structured HTTP request log ──────────────────────────────────────
 app.use((req, _res, next) => {
   logger.debug({ method: req.method, url: req.url }, 'incoming request');
@@ -91,8 +111,14 @@ app.use('/audit-logs',   auditLogRoutes);
 app.use('/activity',     activityRoutes);
 app.use('/teams',        teamRoutes);
 app.use('/health',       healthRoutes);
-app.use('/',             nextcloudRoutes);
-app.use('/portfolio',   require('./src/routes/portfolio.routes.js'));
+app.use('/nextcloud',    nextcloudRoutes);
+app.use('/portfolio',    portfolioRoutes);
+app.use('/analytics',    analyticsRoutes);
+app.use('/governance',   governanceRoutes);
+app.use('/workflow',     workflowRoutes);
+app.use('/support',      supportRoutes);
+app.use('/operational',  operationalRoutes);
+app.use('/archive',      archiveRoutes);
 app.use(errorHandler);
 
 const prisma    = require('./src/utils/prisma');

@@ -44,6 +44,7 @@ export async function setAvailabilityDeadline(payload: AvailabilityDeadline): Pr
 
 export interface PendingUser {
   id:        string
+  name:      string
   email:     string
   role:      string
   createdAt: string

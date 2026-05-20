@@ -1,10 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const { getScoreHistory } = require('../controllers/score.controller');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { validate }    = require('../middleware/validate.middleware');
 const { schemas }     = require('../validation/schemas');
+const { ROLES } = require('../constants/roles');
 
-router.get('/history/:internId', verifyToken, validate(schemas.getScoreHistory), getScoreHistory);
+// Only leads and CORE_ADMIN may fetch any intern's score history.
+// Interns have no self-service score history endpoint — they see scores
+// via their own dashboard which is scoped to their own data.
+const CAN_VIEW_SCORES = [
+  ROLES.CORE_ADMIN,
+  ROLES.TECHNICAL_LEAD,
+  ROLES.OPERATIONS_LEAD,
+  ROLES.RESEARCH_LEAD,
+  ROLES.OPERATIONS_PROGRAM_MANAGER,
+  ROLES.OBSERVER_TEAM_LEAD,
+  ROLES.COLLABORATOR_LEAD,
+];
+
+router.get('/history/:internId', verifyToken, requireRole(...CAN_VIEW_SCORES), validate(schemas.getScoreHistory), getScoreHistory);
 
 module.exports = router;

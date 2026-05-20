@@ -301,105 +301,104 @@ async function seed() {
       });
     }
 
-    // Reviews
-    for (const r of def.reviews) {
-      await prisma.review.create({
-        data: {
-          internId:   intern.id,
-          quality:    r.quality,
-          timeliness: r.timeliness,
-          initiative: r.initiative,
-          complexity: r.complexity,
-        },
+    // Reviews — only create if none exist for this intern yet
+    const existingReviews = await prisma.review.count({ where: { internId: intern.id } });
+    if (existingReviews === 0) {
+      for (const r of def.reviews) {
+        await prisma.review.create({
+          data: {
+            internId:   intern.id,
+            quality:    r.quality,
+            timeliness: r.timeliness,
+            initiative: r.initiative,
+            complexity: r.complexity,
+          },
+        });
+      }
+    }
+
+    // ScoreHistory — 5 weekly capacity entries (skip if already seeded)
+    const existingCapacityHistory = await prisma.scoreHistory.count({
+      where: { internId: intern.id, type: 'capacity' },
+    });
+    if (existingCapacityHistory === 0) {
+      for (let w = 4; w >= 0; w--) {
+        await prisma.scoreHistory.create({
+          data: {
+            internId:  intern.id,
+            score:     def.scoreHistory[4 - w],
+            type:      'capacity',
+            createdAt: daysAgo(w * 7),
+          },
+        });
+      }
+    }
+
+    // ScoreHistory — 3 credibility entries (skip if already seeded)
+    const existingCredHistory = await prisma.scoreHistory.count({
+      where: { internId: intern.id, type: 'credibility' },
+    });
+    if (existingCredHistory === 0) {
+      for (let w = 2; w >= 0; w--) {
+        await prisma.scoreHistory.create({
+          data: {
+            internId:  intern.id,
+            score:     parseFloat((def.credScore.score * 100 + rf(-4, 4)).toFixed(1)),
+            type:      'credibility',
+            createdAt: daysAgo(w * 7 + 1),
+          },
+        });
+      }
+    }
+
+    // Activity logs — only create if none exist for this user yet
+    const existingActivity = await prisma.activity.count({ where: { userId: user.id } });
+    if (existingActivity === 0) {
+      await prisma.activity.create({
+        data: { userId: user.id, type: 'LOGIN', duration: null, timestamp: daysAgo(1) },
+      });
+      await prisma.activity.create({
+        data: { userId: user.id, type: 'TASK_WORK', duration: ri(1800, 7200), timestamp: daysAgo(1) },
+      });
+      await prisma.activity.create({
+        data: { userId: user.id, type: 'LOGIN', duration: null, timestamp: new Date() },
       });
     }
 
-    // ScoreHistory — 5 weekly capacity entries
-    for (let w = 4; w >= 0; w--) {
-      await prisma.scoreHistory.create({
+    // AuditLog — only create if none exist for this user yet
+    const existingAudit = await prisma.auditLog.count({ where: { userId: user.id } });
+    if (existingAudit === 0) {
+      await prisma.auditLog.create({
         data: {
-          internId:  intern.id,
-          score:     def.scoreHistory[4 - w],
-          type:      'capacity',
-          createdAt: daysAgo(w * 7),
+          userId: user.id, action: 'REGISTER', entity: 'USER', entityId: user.id,
+          metadata: { email: user.email, role: 'TECHNICAL_INTERN' }, createdAt: daysAgo(14),
+        },
+      });
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id, action: 'LOGIN', entity: 'USER', entityId: user.id,
+          metadata: { email: user.email }, createdAt: daysAgo(1),
         },
       });
     }
-
-    // ScoreHistory — 3 credibility entries (0–100 integer scale, consistent with new pipeline)
-    for (let w = 2; w >= 0; w--) {
-      await prisma.scoreHistory.create({
-        data: {
-          internId:  intern.id,
-          score:     parseFloat((def.credScore.score * 100 + rf(-4, 4)).toFixed(1)),
-          type:      'credibility',
-          createdAt: daysAgo(w * 7 + 1),
-        },
-      });
-    }
-
-    // Activity logs — login + task_work events
-    await prisma.activity.create({
-      data: {
-        userId:    user.id,
-        type:      'LOGIN',
-        duration:  null,
-        timestamp: daysAgo(1),
-      },
-    });
-    await prisma.activity.create({
-      data: {
-        userId:    user.id,
-        type:      'TASK_WORK',
-        duration:  ri(1800, 7200), // 30 min – 2 hrs in seconds
-        timestamp: daysAgo(1),
-      },
-    });
-    await prisma.activity.create({
-      data: {
-        userId:    user.id,
-        type:      'LOGIN',
-        duration:  null,
-        timestamp: new Date(),
-      },
-    });
-
-    // AuditLog — register + login events
-    await prisma.auditLog.create({
-      data: {
-        userId:   user.id,
-        action:   'REGISTER',
-        entity:   'USER',
-        entityId: user.id,
-        metadata: { email: user.email, role: 'TECHNICAL_INTERN' },
-        createdAt: daysAgo(14),
-      },
-    });
-    await prisma.auditLog.create({
-      data: {
-        userId:   user.id,
-        action:   'LOGIN',
-        entity:   'USER',
-        entityId: user.id,
-        metadata: { email: user.email },
-        createdAt: daysAgo(1),
-      },
-    });
 
     console.log(`✓ Intern: ${def.name} (${def.email}) — capacity ${Math.round(def.capacity.final * 100)}, credibility ${def.credScore.score}`);
   }
 
   // ── Admin audit log ────────────────────────────────────────────────────────
-  await prisma.auditLog.create({
-    data: {
-      userId:   admin.id,
-      action:   'LOGIN',
-      entity:   'USER',
-      entityId: admin.id,
-      metadata: { email: admin.email },
-      createdAt: new Date(),
-    },
-  });
+  const existingAdminAudit = await prisma.auditLog.count({ where: { userId: admin.id, action: 'LOGIN' } });
+  if (existingAdminAudit === 0) {
+    await prisma.auditLog.create({
+      data: {
+        userId:   admin.id,
+        action:   'LOGIN',
+        entity:   'USER',
+        entityId: admin.id,
+        metadata: { email: admin.email },
+        createdAt: new Date(),
+      },
+    });
+  }
 
   // ── Summary ────────────────────────────────────────────────────────────────
   console.log('\n✅  Seed complete!\n');

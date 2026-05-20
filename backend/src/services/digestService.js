@@ -77,7 +77,6 @@ async function generateWeeklyDigest() {
           where:  { 
             internId, 
             createdAt: { gte: getRpiWindowStart() },
-            task: { deletedAt: null }
           },
           select: { quality: true, timeliness: true, initiative: true, complexity: true },
         }),
@@ -87,7 +86,6 @@ async function generateWeeklyDigest() {
           where:  { 
             internId, 
             status: { in: ['active', 'completed'] },
-            deletedAt: null 
           },
           _count: { _all: true },
         }),

@@ -83,7 +83,17 @@ function CountdownTimer() {
 }
 
 export default function Availability() {
-  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
+  const isAdmin = useAuthStore(s => {
+    const role = s.user?.role
+    // Redirect any lead/admin role away from the availability form
+    const LEAD_ROLES = new Set([
+      'core_admin', 'technical_lead', 'operations_lead', 'research_lead',
+      'operations_program_manager', 'observer_team_lead', 'collaborator_lead',
+      // legacy alias
+      'admin',
+    ])
+    return role ? LEAD_ROLES.has(role) : false
+  })
   const navigate = useNavigate()
 
   useEffect(() => {

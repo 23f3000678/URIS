@@ -15,12 +15,30 @@ import Review             from './pages/Review'
 import Team               from './pages/Team'
 import Alerts             from './pages/Alerts'
 import AdminOverview      from './pages/AdminOverview'
+import Intelligence       from './pages/Intelligence'
+import Governance         from './pages/Governance'
 import AuditLogs          from './features/admin/AuditLogs'
 import Notifications      from './pages/Notifications'
 import Portfolio          from './pages/Portfolio'
 import PortfolioEdit      from './pages/PortfolioEdit'
 import { useAuthStore, selectIsAuthenticated, selectIsAdmin } from './store/authStore'
 import { useAlertStore } from './store/alertStore'
+import { ROLES } from './constants/roles'
+
+// ── Role sets for route-level access control ──────────────────────────────────
+// Only CORE_ADMIN can access admin-only pages (overview, governance, audit logs).
+const CORE_ADMIN_ONLY = [ROLES.CORE_ADMIN]
+
+// Leads + CORE_ADMIN can access operational pages (review, team, alerts, intelligence).
+const LEAD_AND_ADMIN_ROLES = [
+  ROLES.CORE_ADMIN,
+  ROLES.TECHNICAL_LEAD,
+  ROLES.OPERATIONS_LEAD,
+  ROLES.RESEARCH_LEAD,
+  ROLES.OPERATIONS_PROGRAM_MANAGER,
+  ROLES.OBSERVER_TEAM_LEAD,
+  ROLES.COLLABORATOR_LEAD,
+]
 
 function AlertPollingManager() {
   const isAuthenticated = useAuthStore(selectIsAuthenticated)
@@ -68,17 +86,23 @@ export default function App() {
           <Route path="/portfolio-edit"
             element={<ProtectedRoute><PortfolioEdit /></ProtectedRoute>} />
 
-          {/* Protected — admin only */}
+          {/* Protected — leads + CORE_ADMIN (operational pages) */}
           <Route path="/review"
-            element={<ProtectedRoute adminOnly><Review /></ProtectedRoute>} />
+            element={<ProtectedRoute allowRoles={LEAD_AND_ADMIN_ROLES}><Review /></ProtectedRoute>} />
           <Route path="/team"
-            element={<ProtectedRoute adminOnly><Team /></ProtectedRoute>} />
+            element={<ProtectedRoute allowRoles={LEAD_AND_ADMIN_ROLES}><Team /></ProtectedRoute>} />
           <Route path="/alerts"
-            element={<ProtectedRoute adminOnly><Alerts /></ProtectedRoute>} />
+            element={<ProtectedRoute allowRoles={LEAD_AND_ADMIN_ROLES}><Alerts /></ProtectedRoute>} />
+          <Route path="/intelligence"
+            element={<ProtectedRoute allowRoles={LEAD_AND_ADMIN_ROLES}><Intelligence /></ProtectedRoute>} />
+
+          {/* Protected — CORE_ADMIN only */}
           <Route path="/admin"
-            element={<ProtectedRoute adminOnly><AdminOverview /></ProtectedRoute>} />
+            element={<ProtectedRoute allowRoles={CORE_ADMIN_ONLY}><AdminOverview /></ProtectedRoute>} />
+          <Route path="/governance"
+            element={<ProtectedRoute allowRoles={CORE_ADMIN_ONLY}><Governance /></ProtectedRoute>} />
           <Route path="/audit-logs"
-            element={<ProtectedRoute adminOnly><AuditLogs /></ProtectedRoute>} />
+            element={<ProtectedRoute allowRoles={CORE_ADMIN_ONLY}><AuditLogs /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />

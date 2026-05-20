@@ -154,16 +154,15 @@ function computeTLI(tasks = []) {
 
 async function getTLIForIntern(internId) {
   const activeTasks = await prisma.task.findMany({
-    where: { internId, status: 'active', deletedAt: null }
+    where: { internId, status: 'active' }
   });
   return computeTLI(activeTasks);
 }
 
 async function removeTask(taskId) {
-  return prisma.task.update({
-    where: { id: taskId },
-    data: { deletedAt: new Date() }
-  });
+  // Hard delete — Task model has no deletedAt field in the current schema.
+  // Tasks are removed by deleting the record directly.
+  return prisma.task.delete({ where: { id: taskId } });
 }
 
 async function detectAndMarkStaleTasks() {
@@ -281,7 +280,7 @@ async function generateAvailabilityReminders() {
 
 async function generateTaskReminders() {
   const activeTasks = await prisma.task.findMany({
-    where: { status: 'active', deletedAt: null },
+    where: { status: 'active' },
   });
 
   let created = 0;
@@ -308,9 +307,7 @@ async function generateTaskReminders() {
 async function getTasksOverviewForAllInterns() {
   const interns = await prisma.intern.findMany({ 
     include: { 
-      tasks: {
-        where: { deletedAt: null }
-      } 
+      tasks: true
     } 
   });
 
@@ -345,7 +342,7 @@ function getTLIBand(tli) {
 
 async function getTaskFilter(user) {
   const { ROLES } = require('../constants/roles');
-  const filter = { deletedAt: null };
+  const filter = {};
   
   switch (user.role) {
     case ROLES.CORE_ADMIN:
