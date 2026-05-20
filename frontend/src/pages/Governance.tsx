@@ -654,7 +654,7 @@ function PermissionsTab({ perms }: { perms: PermissionsResponse | null }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Governance() {
   const user    = useAuthStore(selectUser)
-  const isAdmin = user?.role === ROLES.CORE_ADMIN || user?.role === 'core_admin'
+  const isAdmin = (user?.role as string) === ROLES.CORE_ADMIN
 
   const [tab, setTab]         = useState<Tab>('approvals')
   const [approvalSubTab, setApprovalSubTab] = useState<'pending' | 'history'>('pending')
