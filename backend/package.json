@@ -8,6 +8,8 @@
   },
   "scripts": {
     "start": "node app.js",
+    "build": "npx prisma generate",
+    "postinstall": "npx prisma generate",
     "dev": "nodemon app.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
