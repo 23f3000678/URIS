@@ -14,14 +14,33 @@ async function registerUser(req, res, next) {
     const name     = typeof req.body.name     === 'string' ? req.body.name.trim() : '';
     const email    = typeof req.body.email    === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body.password === 'string' ? req.body.password : '';
-    const role     = typeof req.body.role     === 'string' ? req.body.role.trim() : 'intern';
+    const role     = typeof req.body.role     === 'string' ? req.body.role.trim() : 'TECHNICAL_INTERN';
+    const dateOfBirth = req.body.dateOfBirth || null;
+    const joiningDate = req.body.joiningDate || null;
+    const gdocUrl     = req.body.gdocUrl     || null;
 
     const errors = validateAuth({ email, password });
     if (errors.length > 0) {
       return validationError(res, errors[0]);
     }
 
-    const user = await register({ name, email, password, role });
+    // Handle profile picture upload if file was attached
+    let profilePictureUrl = null;
+    if (req.file) {
+      const uploadService = require('../services/upload.service');
+      try {
+        const result = await uploadService.validateAndStore(req.file.buffer, req.file.originalname, null);
+        profilePictureUrl = result.profilePictureUrl;
+      } catch (uploadErr) {
+        return res.status(uploadErr.status || 422).json({
+          success: false,
+          message: uploadErr.message,
+          data: null,
+        });
+      }
+    }
+
+    const user = await register({ name, email, password, role, dateOfBirth, joiningDate, gdocUrl, profilePictureUrl });
 
     return created(res, user, 'Account created successfully.');
   } catch (err) {

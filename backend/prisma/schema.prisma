@@ -9,34 +9,71 @@ datasource db {
 }
 
 model User {
-  id         String     @id @default(uuid())
-  email      String     @unique
-  password   String
-  role       Role       @default(TECHNICAL_INTERN)
-  createdAt  DateTime   @default(now())
-  status     String     @default("active")
-  name       String     @default("")
-  activities Activity[]
-  auditLogs  AuditLog[]
-  intern     Intern?
-  teams      UserTeam[]
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  password            String
+  role                Role                 @default(TECHNICAL_INTERN)
+  createdAt           DateTime             @default(now())
+  status              String               @default("active")
+  name                String               @default("")
+  profilePictureUrl   String?
+  dateOfBirth         DateTime?
+  joiningDate         DateTime?
+  passwordChangedAt   DateTime?
+  activities          Activity[]
+  auditLogs           AuditLog[]
+  intern              Intern?
+  teams               UserTeam[]
+  passwordResetTokens PasswordResetToken[]
+  observedTasks       TaskObserver[]
+  googleToken         GoogleToken?
+}
+
+model GoogleToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime
+  scope        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Intern {
-  id                String             @id @default(uuid())
-  userId            String?            @unique
-  createdAt         DateTime           @default(now())
-  overrideScore     Float?
-  reservedUntil     DateTime?
-  availabilitySlots AvailabilitySlot[]
-  capacityScore     CapacityScore?
-  credibility       CredibilityScore?
-  user              User?              @relation(fields: [userId], references: [id])
-  digests           InternDigest[]
-  reviews           Review[]
-  scoreHistory      ScoreHistory[]
-  syncLogs          SyncLog[]
-  tasks             Task[]
+  id                     String             @id @default(uuid())
+  userId                 String?            @unique
+  createdAt              DateTime           @default(now())
+  overrideScore          Float?
+  reservedUntil          DateTime?
+  gdocUrl                String?
+  lastGdocReminderSentAt DateTime?
+  gdocLastModified       DateTime?
+  gdocIsStale            Boolean            @default(false)
+  gdocMetaRefreshedAt    DateTime?
+  availabilitySlots      AvailabilitySlot[]
+  capacityScore          CapacityScore?
+  credibility            CredibilityScore?
+  user                   User?              @relation(fields: [userId], references: [id])
+  digests                InternDigest[]
+  reviews                Review[]
+  scoreHistory           ScoreHistory[]
+  syncLogs               SyncLog[]
+  tasks                  Task[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AvailabilitySlot {
@@ -57,6 +94,8 @@ model Task {
   planeTaskId   String    @unique
   internId      String
   title         String
+  description   String?
+  note          String?
   complexity    Float
   progressPct   Int       @default(0)
   status        String    @default("active")
@@ -69,6 +108,36 @@ model Task {
   alerts        Alert[]
   reviews       Review[]
   intern        Intern    @relation(fields: [internId], references: [id])
+  collaborators TaskCollaborator[]
+  observers     TaskObserver[]
+}
+
+model TaskCollaborator {
+  id        String   @id @default(uuid())
+  taskId    String
+  teamId    String
+  addedById String?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, teamId])
+  @@index([taskId])
+  @@index([teamId])
+}
+
+model TaskObserver {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  addedById String?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
 }
 
 model CredibilityScore {
@@ -149,11 +218,12 @@ model SyncLog {
 }
 
 model Team {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  description String?
-  createdAt   DateTime   @default(now())
-  members     UserTeam[]
+  id            String             @id @default(uuid())
+  name          String             @unique
+  description   String?
+  createdAt     DateTime           @default(now())
+  members       UserTeam[]
+  collaborating TaskCollaborator[]
 }
 
 model UserTeam {

@@ -9,6 +9,7 @@ import { getPermissions } from '../utils/permissions'
 import { extractErrorMessage } from '../services/error'
 
 import TaskWorkflowPanel from '../components/TaskWorkflowPanel'
+import TaskCollaborationPanel from '../components/TaskCollaborationPanel'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
 
 const SKILL_COLORS: Record<string, string> = {
@@ -34,7 +35,7 @@ export default function Tasks() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filter, setFilter]   = useState<'all' | 'stale' | 'blocked'>('all')
   const [showCreate, setShowCreate] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', internId: '', complexity: '3', status: 'backlog', planeTaskId: '' })
+  const [newTask, setNewTask] = useState({ title: '', internId: '', complexity: '3', status: 'backlog', planeTaskId: '', description: '' })
   const [creating, setCreating]   = useState(false)
   const [createError, setCreateError] = useState('')
   const user = useAuthStore(selectUser)
@@ -105,7 +106,7 @@ export default function Tasks() {
       if (!newTask.internId) throw new Error('Please select an intern')
       await createTask({ ...newTask, complexity })
       setShowCreate(false)
-      setNewTask({ title: '', internId: '', complexity: '3', status: 'backlog', planeTaskId: '' })
+      setNewTask({ title: '', internId: '', complexity: '3', status: 'backlog', planeTaskId: '', description: '' })
       await fetchData()
     } catch (err: unknown) {
       setCreateError(extractErrorMessage(err, 'Failed to create task.'))
@@ -404,6 +405,13 @@ export default function Tasks() {
                                 isAdmin={permissions.canAssign !== 'NO'}
                               />
                             </div>
+
+                            {/* Collaboration panel — description, collaborator teams, observers */}
+                            <TaskCollaborationPanel
+                              taskId={task.id}
+                              description={task.description}
+                              isAdmin={permissions.canAssign !== 'NO'}
+                            />
 
                             {/* Admin controls panel */}
                             {permissions.canAssign !== 'NO' && task.status !== 'completed' && (
@@ -710,6 +718,15 @@ export default function Tasks() {
                   </label>
                   <input className="uris-input" placeholder="e.g. plane-task-123 — auto-generated if blank"
                     value={newTask.planeTaskId} onChange={e => setNewTask(f => ({ ...f, planeTaskId: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="nav-label text-[0.6rem] text-gold/60 block mb-2">
+                    DESCRIPTION <span className="text-ice/25">(OPTIONAL)</span>
+                  </label>
+                  <textarea rows={3} maxLength={2000} className="uris-input w-full resize-none text-sm"
+                    placeholder="Task description, context, or requirements..."
+                    value={newTask.description}
+                    onChange={e => setNewTask(f => ({ ...f, description: e.target.value }))} />
                 </div>
                 {createError && (
                   <p className="font-body text-sm text-red-400/80 text-center py-2 rounded-sm"

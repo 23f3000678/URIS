@@ -85,13 +85,12 @@ const VALID_BLOCKER_TYPES = [
   'api_access', 'dependency', 'unclear_req',
 ];
 
-// Roles that can be self-registered. Admin and lead roles must be
-// created or promoted internally by CORE_ADMIN only.
+// Roles that can be self-registered via the public registration form.
+// OPERATIONS_INTERN and ORENDA_MEMBER are excluded — they must be created
+// internally by CORE_ADMIN. This matches auth.service.js PUBLIC_ROLES.
 const SELF_REGISTERABLE_ROLES = new Set([
   'TECHNICAL_INTERN',
-  'OPERATIONS_INTERN',
   'RESEARCH_INTERN',
-  'ORENDA_MEMBER',
 ]);
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
@@ -624,6 +623,46 @@ const runDemo = Joi.object({
   query:  Joi.object(),
 });
 
+// ── Profile & Password schemas ─────────────────────────────────────────────────
+
+const updateProfile = Joi.object({
+  body: Joi.object({
+    name:              Joi.string().trim().min(1).max(100).optional(),
+    profilePictureUrl: Joi.string().max(2048).optional().allow('', null),
+    gdocUrl:           Joi.string().max(2048).optional().allow('', null),
+  }).min(1),
+  params: Joi.object(),
+  query:  Joi.object(),
+});
+
+const changePassword = Joi.object({
+  body: Joi.object({
+    currentPassword: Joi.string().required(),
+    newPassword:     Joi.string().min(8).max(128).required(),
+    confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required()
+      .messages({ 'any.only': 'Passwords do not match.' }),
+  }).required(),
+  params: Joi.object(),
+  query:  Joi.object(),
+});
+
+const forgotPassword = Joi.object({
+  body:   Joi.object({ email: Joi.string().email().required() }).required(),
+  params: Joi.object(),
+  query:  Joi.object(),
+});
+
+const resetPassword = Joi.object({
+  body: Joi.object({
+    token:           Joi.string().required(),
+    newPassword:     Joi.string().min(8).max(128).required(),
+    confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required()
+      .messages({ 'any.only': 'Passwords do not match.' }),
+  }).required(),
+  params: Joi.object(),
+  query:  Joi.object(),
+});
+
 // ── Exports ────────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -632,6 +671,11 @@ module.exports = {
     register,
     login,
     recordActivity,
+    // profile & password
+    updateProfile,
+    changePassword,
+    forgotPassword,
+    resetPassword,
     // availability
     submitAvailability,
     getAvailability,

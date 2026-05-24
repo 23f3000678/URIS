@@ -8,6 +8,8 @@ import { useAuthStore, selectUser } from '../store/authStore'
 import { extractErrorMessage } from '../services/error'
 import ActivitySummaryCard from '../components/ActivitySummaryCard'
 import AnomalyAlertPanel  from '../components/AnomalyAlertPanel'
+import GoogleWorklogPanel from '../components/GoogleWorklogPanel'
+import GoogleCalendarPanel from '../components/GoogleCalendarPanel'
 import { useTeamStore, selectActiveTeam } from '../store/teamStore'
 import { getTeamContribution, type TeamContribution } from '../services/team.service'
 import api from '../services/api'
@@ -384,6 +386,18 @@ export default function InternDashboard() {
                 )}
               </motion.div>
               
+              {/* Google Work Log Status */}
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45 }} className="mt-6">
+                <GoogleWorklogPanel />
+              </motion.div>
+
+              {/* Google Calendar Availability */}
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }} className="mt-4">
+                <GoogleCalendarPanel />
+              </motion.div>
+
               {/* STEMONEF BRANDING */}
               <div className="mt-12 py-8 flex flex-col items-center gap-4 opacity-40">
                 <div className="h-[1px] w-12 bg-gold/20" />

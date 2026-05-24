@@ -73,4 +73,12 @@ const apiLimiter = rateLimit({
   skip: (req) => req.path.startsWith('/health'),
 });
 
-module.exports = { loginLimiter, registerLimiter, apiLimiter };
+const forgotPasswordLimiter = rateLimit({
+  windowMs:        parseInt(process.env.RATE_LIMIT_FORGOT_WINDOW_MS) || 15 * 60 * 1000,
+  max:             parseInt(process.env.RATE_LIMIT_FORGOT_MAX)        || 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders:   false,
+  handler:         rateLimitHandler,
+});
+
+module.exports = { loginLimiter, registerLimiter, apiLimiter, forgotPasswordLimiter };

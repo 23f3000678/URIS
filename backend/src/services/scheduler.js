@@ -30,6 +30,8 @@ const DEFAULT_DEADLINE_CRON     = '0 * * * *';   // Every hour
 const DEFAULT_AVAILABILITY_CRON = '0 9 * * 1';   // Monday 09:00 UTC
 const DEFAULT_TASK_REMINDER_CRON = '0 9 * * 0,4'; // Thursday and Sunday 09:00 UTC
 const DEFAULT_FORM_REMINDER_CRON = '0 9 */3 * *'; // Every 3 days at 09:00 UTC
+const DEFAULT_GDOC_REMINDER_CRON = '0 9 */3 * *'; // Every 3 days at 09:00 UTC
+const DEFAULT_GDOC_META_CRON     = '0 */6 * * *'; // Every 6 hours
 
 let _syncTask         = null;
 let _digestTask       = null;
@@ -37,6 +39,8 @@ let _deadlineTask     = null;
 let _availabilityTask = null;
 let _taskReminderTask = null;
 let _formReminderTask = null;
+let _gdocReminderTask = null;
+let _gdocMetaTask     = null;
 
 function _startSyncJob() {
   const expression = process.env.SYNC_INTERVAL_CRON || DEFAULT_SYNC_CRON;
@@ -110,6 +114,8 @@ function start() {
   _startAvailabilityReminderJob();
   _startTaskReminderJob();
   _startFormReminderJob();
+  _startGdocReminderJob();
+  _startGdocMetaRefreshJob();
 }
 
 function stop() {
@@ -119,6 +125,8 @@ function stop() {
   if (_availabilityTask) { _availabilityTask.stop(); _availabilityTask = null; }
   if (_taskReminderTask) { _taskReminderTask.stop(); _taskReminderTask = null; }
   if (_formReminderTask) { _formReminderTask.stop(); _formReminderTask = null; }
+  if (_gdocReminderTask) { _gdocReminderTask.stop(); _gdocReminderTask = null; }
+  if (_gdocMetaTask)     { _gdocMetaTask.stop();     _gdocMetaTask     = null; }
   logger.info('All scheduled jobs stopped');
 }
 
@@ -190,4 +198,48 @@ function _startFormReminderJob() {
   });
 }
 
+function _startGdocReminderJob() {
+  const expression = process.env.GDOC_REMINDER_CRON || DEFAULT_GDOC_REMINDER_CRON;
+
+  if (!cron.validate(expression)) {
+    logger.warn({ expression }, 'GDOC_REMINDER_CRON is not a valid cron expression — falling back to default');
+    return _startGdocReminderJobWithExpression(DEFAULT_GDOC_REMINDER_CRON);
+  }
+
+  return _startGdocReminderJobWithExpression(expression);
+}
+
+function _startGdocReminderJobWithExpression(expression) {
+  logger.info({ expression }, 'Starting GDoc reminder job');
+  _gdocReminderTask = cron.schedule(expression, async () => {
+    try {
+      const { sendGdocReminders } = require('./notification.service');
+      const { sent, errors } = await sendGdocReminders();
+      if (errors > 0) logger.warn({ sent, errors }, 'GDoc reminder job completed with errors');
+      else logger.info({ sent }, 'GDoc reminder job completed successfully');
+    } catch (err) {
+      logger.error({ err }, 'GDoc reminder job threw unexpectedly');
+    }
+  });
+}
+
 module.exports = { start, stop };
+
+function _startGdocMetaRefreshJob() {
+  const expression = process.env.GDOC_META_CRON || DEFAULT_GDOC_META_CRON;
+  if (!cron.validate(expression)) {
+    logger.warn({ expression }, 'GDOC_META_CRON is not valid — falling back to default');
+  }
+  const expr = cron.validate(expression) ? expression : DEFAULT_GDOC_META_CRON;
+  logger.info({ expr }, 'Starting GDoc metadata refresh job');
+  _gdocMetaTask = cron.schedule(expr, async () => {
+    try {
+      const { refreshAllGdocMetadata } = require('./google.service');
+      const { refreshed, errors } = await refreshAllGdocMetadata();
+      if (errors > 0) logger.warn({ refreshed, errors }, 'GDoc meta refresh completed with errors');
+      else logger.info({ refreshed }, 'GDoc meta refresh completed');
+    } catch (err) {
+      logger.error({ err }, 'GDoc meta refresh job threw unexpectedly');
+    }
+  });
+}

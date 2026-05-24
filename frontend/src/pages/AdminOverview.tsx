@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, TrendingUp, X, Check, UserCheck, AlertTriangle, Loader2, Clock } from 'lucide-react'
+import { Shield, TrendingUp, X, Check, UserCheck, AlertTriangle, Loader2, Clock, ShieldCheck } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
@@ -8,6 +8,7 @@ import { getAllTasks, type Task } from '../services/tasks.service'
 import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, getPendingUsers, approveUser, type AvailabilityDeadline, type PendingUser } from '../services/admin.service'
 import { updateTaskStatus } from '../services/tasks.service'
 import { extractErrorMessage } from '../services/error'
+import RoleManagementModal from '../components/RoleManagementModal'
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sunday' },
@@ -24,7 +25,7 @@ export default function AdminOverview() {
   const [tasks, setTasks]         = useState<Task[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
-  const [activeTab, setActiveTab] = useState<'override' | 'assign' | 'status' | 'deadline' | 'approvals'>('assign')
+  const [activeTab, setActiveTab] = useState<'override' | 'assign' | 'status' | 'deadline' | 'approvals' | 'roles'>('assign')
 
   // Override score form
   const [overrideInternId, setOverrideInternId] = useState('')
@@ -57,6 +58,9 @@ export default function AdminOverview() {
   const [pendingUsers, setPendingUsers]         = useState<PendingUser[]>([])
   const [approvingId, setApprovingId]           = useState<string | null>(null)
   const [approvalMsg, setApprovalMsg]           = useState<{ ok: boolean; text: string } | null>(null)
+
+  // Role management modal
+  const [showRoleModal, setShowRoleModal] = useState(false)
 
   useEffect(() => {
     async function load(): Promise<void> {
@@ -172,6 +176,7 @@ export default function AdminOverview() {
     { key: 'status',    label: 'UPDATE STATUS',  icon: TrendingUp },
     { key: 'deadline',  label: 'DEADLINE',        icon: Clock },
     { key: 'approvals', label: 'APPROVALS',       icon: UserCheck, badge: pendingUsers.length },
+    { key: 'roles',     label: 'ROLES',           icon: ShieldCheck },
   ] as const
 
   return (
@@ -572,6 +577,26 @@ export default function AdminOverview() {
                       </motion.form>
                     )}
 
+                    {/* ROLES */}
+                    {activeTab === 'roles' && (
+                      <motion.div key="roles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }} className="space-y-4">
+                        <div className="mb-3">
+                          <p className="nav-label text-[0.55rem] text-gold/40">ROLE MANAGEMENT</p>
+                          <p className="font-body text-xs text-ice/30 mt-1">
+                            Change user roles across the organisation.
+                          </p>
+                        </div>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                          onClick={() => setShowRoleModal(true)}
+                          className="btn-gold w-full py-3 rounded-sm flex items-center justify-center gap-2 text-sm">
+                          <ShieldCheck size={14} />
+                          OPEN ROLE MANAGER
+                        </motion.button>
+                      </motion.div>
+                    )}
+
                   </AnimatePresence>
                 </div>
               </motion.div>
@@ -579,6 +604,13 @@ export default function AdminOverview() {
           )}
         </div>
       </main>
+
+      {/* Role Management Modal */}
+      <AnimatePresence>
+        {showRoleModal && (
+          <RoleManagementModal onClose={() => setShowRoleModal(false)} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

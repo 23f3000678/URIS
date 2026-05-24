@@ -410,7 +410,28 @@ async function finishInternship(req, res, next) {
   }
 }
 
-module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole };
+module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers };
+
+// ── Get all users (for role management UI) ────────────────────────────────────
+
+async function getAllUsers(req, res, next) {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id:        true,
+        name:      true,
+        email:     true,
+        role:      true,
+        status:    true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return ok(res, users, 'Users fetched');
+  } catch (err) {
+    next(err);
+  }
+}
 
 // ── Phase 2: IP Block Management ──────────────────────────────────────────────
 

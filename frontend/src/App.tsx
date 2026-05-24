@@ -21,6 +21,10 @@ import AuditLogs          from './features/admin/AuditLogs'
 import Notifications      from './pages/Notifications'
 import Portfolio          from './pages/Portfolio'
 import PortfolioEdit      from './pages/PortfolioEdit'
+import Profile            from './pages/Profile'
+import Settings           from './pages/Settings'
+import ForgotPassword     from './pages/ForgotPassword'
+import ResetPassword      from './pages/ResetPassword'
 import { useAuthStore, selectIsAuthenticated, selectIsAdmin } from './store/authStore'
 import { useAlertStore } from './store/alertStore'
 import { ROLES } from './constants/roles'
@@ -69,9 +73,11 @@ export default function App() {
 
         <Routes>
           {/* Public routes */}
-          <Route path="/"         element={<Landing />} />
-          <Route path="/login"    element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/"                element={<Landing />} />
+          <Route path="/login"           element={<Login />} />
+          <Route path="/register"        element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password"  element={<ResetPassword />} />
           <Route path="/portfolio/:slug" element={<Portfolio />} />
 
           {/* Protected — any authenticated user */}
@@ -85,6 +91,12 @@ export default function App() {
             element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/portfolio-edit"
             element={<ProtectedRoute><PortfolioEdit /></ProtectedRoute>} />
+
+          {/* Protected — any authenticated user (new) */}
+          <Route path="/profile"
+            element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/settings"
+            element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
           {/* Protected — leads + CORE_ADMIN (operational pages) */}
           <Route path="/review"

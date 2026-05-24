@@ -14,6 +14,7 @@ const {
   listBlockedIPs,
   getLoginLogs,
   changeUserRole,
+  getAllUsers,
 } = require('../controllers/admin.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { validate }                 = require('../middleware/validate.middleware');
@@ -45,5 +46,6 @@ router.delete('/block-ip',              verifyToken, requireRole(ROLES.CORE_ADMI
 router.get('/blocked-ips',              verifyToken, requireRole(ROLES.CORE_ADMIN),                                   listBlockedIPs);
 router.get('/login-logs',               verifyToken, requireRole(ROLES.CORE_ADMIN),                                   getLoginLogs);
 router.post('/change-role',             verifyToken, requireRole(ROLES.CORE_ADMIN),                                   changeUserRole);
+router.get('/users',                    verifyToken, requireRole(ROLES.CORE_ADMIN),                                   getAllUsers);
 
 module.exports = router;

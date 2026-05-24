@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, CalendarDays, ClipboardList, Star, Users, Bell, LogOut, ChevronRight, ShieldCheck, ScrollText, TrendingUp, Shield, Menu, X } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, ClipboardList, Star, Users, Bell, LogOut, ChevronRight, ShieldCheck, ScrollText, TrendingUp, Shield, Menu, X, UserCircle, Settings } from 'lucide-react'
 import { useAuthStore, selectUser, selectIsAdmin } from '../store/authStore'
 import { useAlertStore } from '../store/alertStore'
 import TeamSwitcher from './TeamSwitcher'
@@ -21,6 +21,8 @@ const allItems = [
   { icon: Shield,          label: 'Governance',    to: '/governance' },
   { icon: ScrollText,      label: 'Audit Logs',    to: '/audit-logs' },
   { icon: LayoutDashboard, label: 'Portfolio',     to: '/portfolio-edit' },
+  { icon: UserCircle,      label: 'Profile',       to: '/profile' },
+  { icon: Settings,        label: 'Settings',      to: '/settings' },
 ]
 
 export default function Sidebar() {

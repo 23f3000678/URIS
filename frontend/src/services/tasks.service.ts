@@ -6,6 +6,7 @@ import api from './api'
 export interface Task {
   id: string
   title: string
+  description?: string | null
   assignee?: string
   internId?: string
   status: string
@@ -29,6 +30,7 @@ export interface CreateTaskPayload {
   planeTaskId?: string
   complexity: number
   status: string
+  description?: string
 }
 
 export interface UpdateStatusPayload {

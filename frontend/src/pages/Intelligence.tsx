@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   Activity, AlertTriangle, CheckCircle, Clock, Loader2,
-  TrendingUp, Users, Zap, Shield, BarChart2, Target, Bell, TrendingDown,
+  TrendingUp, Users, Zap, Shield, BarChart2, Target, Bell, TrendingDown, Globe,
 } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
@@ -14,6 +14,7 @@ import {
   getAnalyticsDashboard,
   type AnalyticsDashboard,
 } from '../services/analytics.service'
+import { getGoogleIntelligence, type GoogleIntelligence } from '../services/google.service'
 import { extractErrorMessage } from '../services/error'
 
 const GOLD    = '#c9a84c'
@@ -110,7 +111,7 @@ function ChartTooltip({ active, payload, label }: any) {
   )
 }
 
-type Tab = 'overview' | 'risks' | 'assignment' | 'workload' | 'trends' | 'alerts' | 'sla' | 'teams' | 'digest'
+type Tab = 'overview' | 'risks' | 'assignment' | 'workload' | 'trends' | 'alerts' | 'sla' | 'teams' | 'digest' | 'google'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'overview',   label: 'OVERVIEW',   icon: BarChart2 },
@@ -122,6 +123,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'sla',        label: 'SLA',        icon: Shield },
   { key: 'teams',      label: 'TEAMS',      icon: Users },
   { key: 'digest',     label: 'DIGEST',     icon: Zap },
+  { key: 'google',     label: 'GOOGLE',     icon: Globe },
 ]
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
@@ -710,12 +712,155 @@ function DigestTab({ data }: { data: AnalyticsDashboard }) {
   )
 }
 
+// ── Google Intelligence Tab ───────────────────────────────────────────────────
+function GoogleTab({ data }: { data: GoogleIntelligence }) {
+  const { summary, staleWorklogs, noWorklog, notConnected, activeWorklogs } = data
+
+  return (
+    <div className="space-y-6">
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard icon={Users}         label="TOTAL INTERNS"      value={summary.totalInterns}        color={GOLD} />
+        <StatCard icon={CheckCircle}   label="GOOGLE CONNECTED"   value={summary.connectedToGoogle}   color={GREEN} />
+        <StatCard icon={AlertTriangle} label="STALE WORKLOGS"     value={summary.staleWorklogCount}   color={AMBER} sub={`>${summary.staleDaysThreshold}d no update`} />
+        <StatCard icon={AlertTriangle} label="NO WORKLOG SET"     value={summary.noWorklogCount}      color={RED} />
+      </div>
+
+      {/* Stale worklogs */}
+      {staleWorklogs.length > 0 && (
+        <div className="glass-card rounded-sm p-5">
+          <SectionHeader label="WORKLOG INTELLIGENCE" title="Stale Work Logs" />
+          <div className="overflow-x-auto">
+            <table className="uris-table w-full">
+              <thead><tr>
+                <th className="text-left">Intern</th>
+                <th className="text-center">Last Updated</th>
+                <th className="text-center">Days Stale</th>
+                <th className="text-center">Google</th>
+                <th className="text-center">Status</th>
+              </tr></thead>
+              <tbody>
+                {staleWorklogs.map(w => (
+                  <tr key={w.internId}>
+                    <td className="font-body text-sm text-frost/80">{w.name}</td>
+                    <td className="text-center font-mono text-xs text-ice/50">
+                      {w.lastModified
+                        ? new Date(w.lastModified).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </td>
+                    <td className="text-center font-mono text-sm" style={{ color: (w.daysSinceUpdate ?? 0) > 7 ? RED : AMBER }}>
+                      {w.daysSinceUpdate != null ? `${w.daysSinceUpdate}d` : '—'}
+                    </td>
+                    <td className="text-center">
+                      {w.isConnected
+                        ? <CheckCircle size={12} style={{ color: GREEN, margin: 'auto' }} />
+                        : <AlertTriangle size={12} style={{ color: AMBER, margin: 'auto' }} />}
+                    </td>
+                    <td className="text-center">
+                      <span className="nav-label text-[0.5rem] px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(245,158,11,0.12)', color: AMBER }}>
+                        STALE
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Not connected to Google */}
+      {notConnected.length > 0 && (
+        <div className="glass-card rounded-sm p-5">
+          <SectionHeader label="CONNECTION STATUS" title="Interns Not Connected to Google" />
+          <div className="space-y-2">
+            {notConnected.map(i => (
+              <div key={i.internId} className="flex items-center justify-between p-3 rounded-sm"
+                style={{ background: 'rgba(184,212,240,0.04)', border: '1px solid rgba(184,212,240,0.08)' }}>
+                <p className="font-body text-sm text-frost/70">{i.name}</p>
+                <span className="nav-label text-[0.5rem] px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(184,212,240,0.08)', color: ICE_DIM }}>
+                  {i.hasGdoc ? 'HAS GDOC · NOT CONNECTED' : 'NO GDOC · NOT CONNECTED'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* No worklog set */}
+      {noWorklog.length > 0 && (
+        <div className="glass-card rounded-sm p-5">
+          <SectionHeader label="WORKLOG GAPS" title="Interns Without Work Log URL" />
+          <div className="space-y-2">
+            {noWorklog.map(i => (
+              <div key={i.internId} className="flex items-center justify-between p-3 rounded-sm"
+                style={{ background: 'rgba(248,113,113,0.04)', border: '1px solid rgba(248,113,113,0.1)' }}>
+                <p className="font-body text-sm text-frost/70">{i.name}</p>
+                <span className="nav-label text-[0.5rem] px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(248,113,113,0.1)', color: RED }}>
+                  NO WORKLOG
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active worklogs */}
+      {activeWorklogs.length > 0 && (
+        <div className="glass-card rounded-sm p-5">
+          <SectionHeader label="ACTIVE WORKLOGS" title="Up-to-Date Work Logs" />
+          <div className="space-y-2">
+            {activeWorklogs.map(i => (
+              <div key={i.internId} className="flex items-center justify-between p-3 rounded-sm"
+                style={{ background: 'rgba(74,222,128,0.04)', border: '1px solid rgba(74,222,128,0.1)' }}>
+                <p className="font-body text-sm text-frost/70">{i.name}</p>
+                <div className="flex items-center gap-2">
+                  {i.lastModified && (
+                    <span className="nav-label text-[0.48rem] text-ice/30">
+                      {new Date(i.lastModified).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                    </span>
+                  )}
+                  <span className="nav-label text-[0.5rem] px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(74,222,128,0.1)', color: GREEN }}>
+                    ACTIVE
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {staleWorklogs.length === 0 && notConnected.length === 0 && noWorklog.length === 0 && (
+        <div className="glass-card rounded-sm p-10 text-center">
+          <CheckCircle size={28} className="mx-auto mb-3" style={{ color: GREEN }} />
+          <p className="font-body text-sm" style={{ color: ICE_DIM }}>All work logs are active and up to date.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main page component ───────────────────────────────────────────────────────
 export default function Intelligence() {
   const [data, setData]       = useState<AnalyticsDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
   const [tab, setTab]         = useState<Tab>('overview')
+  const [googleData, setGoogleData]       = useState<GoogleIntelligence | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  useEffect(() => {
+    if (tab !== 'google' || googleData) return
+    setGoogleLoading(true)
+    getGoogleIntelligence()
+      .then(d => setGoogleData(d))
+      .catch(() => setGoogleData(null))
+      .finally(() => setGoogleLoading(false))
+  }, [tab])
 
   useEffect(() => {
     getAnalyticsDashboard()
@@ -779,6 +924,19 @@ export default function Intelligence() {
                 {tab === 'sla'        && <SLATab        data={data} />}
                 {tab === 'teams'      && <TeamsTab      data={data} />}
                 {tab === 'digest'     && <DigestTab     data={data} />}
+                {tab === 'google'     && (
+                  googleLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 size={24} className="text-gold animate-spin" />
+                    </div>
+                  ) : googleData ? (
+                    <GoogleTab data={googleData} />
+                  ) : (
+                    <div className="glass-card rounded-sm p-10 text-center">
+                      <p className="font-body text-sm text-ice/30">Google intelligence data unavailable.</p>
+                    </div>
+                  )
+                )}
               </motion.div>
             </>
           )}

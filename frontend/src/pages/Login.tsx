@@ -106,6 +106,11 @@ export default function Login() {
               New intern?{' '}
               <Link to="/register" className="text-gold/70 hover:text-gold transition-colors no-underline">Request access</Link>
             </p>
+            <p className="font-body text-sm text-ice/20 mt-2">
+              <Link to="/forgot-password" className="text-ice/40 hover:text-gold/70 transition-colors no-underline text-xs">
+                Forgot your password?
+              </Link>
+            </p>
           </div>
         </div>
         <p className="text-center nav-label text-[0.5rem] text-ice/15 mt-6 tracking-ultra">

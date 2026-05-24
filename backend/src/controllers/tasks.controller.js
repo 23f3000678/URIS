@@ -34,24 +34,69 @@ async function getTasksOverview(req, res, next) {
 async function getTaskById(req, res, next) {
   try {
     const { taskId } = req.params;
+    const { hasCollaborativeAccess } = require('../services/collaborationService');
 
     const filter = await getTaskFilter(req.user);
     filter.id = taskId;
 
-    const task = await prisma.task.findFirst({
+    let task = await prisma.task.findFirst({
       where: filter,
       include: {
         intern: {
-          select: {
-            user: { select: { name: true, email: true } }
-          }
-        }
-      }
+          select: { user: { select: { name: true, email: true } } }
+        },
+        collaborators: {
+          include: {
+            team: {
+              select: {
+                id: true, name: true,
+                members: {
+                  where: { leftAt: null },
+                  include: { user: { select: { id: true, name: true, email: true, role: true } } },
+                },
+              },
+            },
+          },
+        },
+        observers: {
+          include: { user: { select: { id: true, name: true, email: true, role: true } } },
+        },
+      },
     });
 
-    if (!task) return notFound(res, 'Task not found or access denied');
+    // If not found via primary filter, check collaborative access
+    if (!task) {
+      const hasAccess = await hasCollaborativeAccess(taskId, req.user.id);
+      if (!hasAccess) return notFound(res, 'Task not found or access denied');
 
-    // Role-based field masking (LIMITED visibility)
+      task = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: {
+          intern: {
+            select: { user: { select: { name: true, email: true } } }
+          },
+          collaborators: {
+            include: {
+              team: {
+                select: {
+                  id: true, name: true,
+                  members: {
+                    where: { leftAt: null },
+                    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+                  },
+                },
+              },
+            },
+          },
+          observers: {
+            include: { user: { select: { id: true, name: true, email: true, role: true } } },
+          },
+        },
+      });
+      if (!task) return notFound(res, 'Task not found');
+    }
+
+    // Role-based field masking
     if (req.user.role === ROLES.OPERATIONS_LEAD || req.user.role === ROLES.OPERATIONS_PROGRAM_MANAGER) {
       delete task.complexity;
       delete task.skills;
@@ -84,12 +129,15 @@ async function getTasks(req, res, next) {
         select:  {
           id:           true,
           title:        true,
+          description:  true,
+          note:         true,
           status:       true,
           internId:     true,
           complexity:   true,
           progressPct:  true,
           hasBlocker:   true,
           blockerType:  true,
+          skills:       true,
           deadline:     true,
           lastUpdatedAt: true,
           createdAt:    true,
@@ -106,13 +154,18 @@ async function getTasks(req, res, next) {
       prisma.task.count({ where: filter }),
     ]);
 
+    const now        = new Date();
+    const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+
     // Mask fields for LIMITED roles in list view
     const tasksWithAssignee = tasks.map(t => {
       const task = {
         ...t,
-        assignee: t.intern?.user?.name || t.intern?.user?.email || null,
-        deadline: t.deadline ? t.deadline.toISOString().split('T')[0] : null,
-        intern:   undefined,
+        assignee:  t.intern?.user?.name || t.intern?.user?.email || null,
+        deadline:  t.deadline ? t.deadline.toISOString().split('T')[0] : null,
+        // isStale: not updated in DB by scheduler in all cases — compute on read
+        isStale:   t.status !== 'completed' && t.lastUpdatedAt < twoDaysAgo,
+        intern:    undefined,
       };
 
       if (req.user.role === ROLES.OPERATIONS_LEAD || req.user.role === ROLES.OPERATIONS_PROGRAM_MANAGER) {
@@ -135,22 +188,19 @@ async function getTasks(req, res, next) {
 
 async function createTask(req, res, next) {
   try {
-    const { title, complexity, internId, skills = [], deadline } = req.body;
+    const { title, description, complexity, internId, skills = [], deadline } = req.body;
 
-    // Use the provided planeTaskId or generate a unique fallback so tasks
-    // created without a Plane integration still satisfy the @unique constraint.
     const planeTaskId = req.body.planeTaskId?.trim() || `manual-${randomUUID()}`;
 
-    // Business-level rules: integer complexity, future deadline, unique planeTaskId, intern exists
     const biz = await validateTaskCreation({ complexity, deadline, planeTaskId, internId });
     if (!biz.ok) {
       return businessError(res, biz.status, biz.message);
     }
 
-    // Intern existence confirmed by validateTaskCreation — safe to create directly
     const task = await prisma.task.create({
       data: {
         title,
+        description: description?.trim() || null,
         complexity,
         internId,
         planeTaskId,
@@ -203,8 +253,9 @@ async function internUpdateTask(req, res, next) {
     const updateData = {
       progressPct,
       lastUpdatedAt: new Date(),
-      ...(typeof hasBlocker === 'boolean' ? { hasBlocker } : {}),
-      ...(blockerType !== undefined ? { blockerType: hasBlocker ? blockerType : null } : {}),
+      ...(typeof note === 'string'         ? { note: note.trim() || null }          : {}),
+      ...(typeof hasBlocker === 'boolean'  ? { hasBlocker }                         : {}),
+      ...(blockerType !== undefined        ? { blockerType: hasBlocker ? blockerType : null } : {}),
     };
 
     const updated = await prisma.task.update({
@@ -305,4 +356,27 @@ async function deleteTask(req, res, next) {
   }
 }
 
-module.exports = { getTasksOverview, getTasks, createTask, internUpdateTask, deleteTask, getTaskById };
+async function updateTaskDescription(req, res, next) {
+  try {
+    const { taskId } = req.params;
+    const { description } = req.body;
+
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task) return notFound(res, 'Task not found');
+
+    const updated = await prisma.task.update({
+      where: { id: taskId },
+      data:  { description: typeof description === 'string' ? description.trim() || null : null },
+    });
+
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.UPDATE_TASK, AUDIT_ENTITIES.TASK, taskId, {
+      field: 'description',
+    });
+
+    return ok(res, { id: updated.id, description: updated.description }, 'Description updated.');
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getTasksOverview, getTasks, createTask, internUpdateTask, deleteTask, getTaskById, updateTaskDescription };

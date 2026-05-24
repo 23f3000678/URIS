@@ -11,7 +11,7 @@ const { authError, forbidden } = require('../utils/respond');
  * Returns 401 for missing, malformed, expired, or invalid tokens.
  * Never exposes the raw JWT error to the client.
  */
-function verifyToken(req, res, next) {
+async function verifyToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ')
     ? authHeader.slice(7).trim()
@@ -23,6 +23,23 @@ function verifyToken(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Session invalidation: if password was changed after token was issued, reject
+    // We do a lightweight DB check only when passwordChangedAt might be set
+    const prisma = require('../utils/prisma');
+    const user = await prisma.user.findUnique({
+      where:  { id: decoded.id },
+      select: { id: true, email: true, role: true, passwordChangedAt: true },
+    });
+
+    if (!user) {
+      return authError(res, 'Invalid or expired token.');
+    }
+
+    if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+      return authError(res, 'Session expired. Please log in again.');
+    }
+
     req.user = {
       id:    decoded.id,
       email: decoded.email,

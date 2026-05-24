@@ -15,10 +15,18 @@ if (!process.env.JWT_SECRET) {
 
 // ── Register ──────────────────────────────────────────────────────────────────
 
-async function register({ name, email, password, role }) {
+async function register({ name, email, password, role, dateOfBirth, joiningDate, gdocUrl, profilePictureUrl }) {
   const prismaRole = normalizeRole(role ?? 'intern');
   if (!prismaRole) {
     const err = new Error(`Invalid role "${role}". Accepted values: intern, admin.`);
+    err.status = 400;
+    throw err;
+  }
+
+  // Restrict public registration to TECHNICAL_INTERN and RESEARCH_INTERN only
+  const PUBLIC_ROLES = new Set(['TECHNICAL_INTERN', 'RESEARCH_INTERN']);
+  if (!PUBLIC_ROLES.has(prismaRole)) {
+    const err = new Error('Role not permitted for public registration.');
     err.status = 400;
     throw err;
   }
@@ -32,18 +40,37 @@ async function register({ name, email, password, role }) {
 
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-  // All new registrations (Admins, Leads, Interns) start as 'pending'.
-  // They must be approved by an existing Admin or Lead via the dashboard.
   const status = 'pending';
 
-  // Derive a display name: use the provided name if non-empty, otherwise fall
-  // back to the email prefix so existing behaviour is preserved.
   const displayName = (typeof name === 'string' && name.trim())
     ? name.trim()
     : email.split('@')[0];
 
+  // Validate GDoc URL for intern roles
+  const isInternRole = prismaRole.includes('INTERN');
+  if (isInternRole && gdocUrl) {
+    const GDOC_PREFIX = 'https://docs.google.com/document/d/';
+    if (!gdocUrl.startsWith(GDOC_PREFIX) || !/\S/.test(gdocUrl.slice(GDOC_PREFIX.length))) {
+      const err = new Error('Invalid Google Docs URL. Must begin with https://docs.google.com/document/d/');
+      err.status = 422;
+      throw err;
+    }
+  }
+
+  const userData = {
+    email,
+    password: hashedPassword,
+    name: displayName,
+    role: prismaRole,
+    status,
+  };
+
+  if (dateOfBirth) userData.dateOfBirth = new Date(dateOfBirth);
+  if (joiningDate) userData.joiningDate = new Date(joiningDate);
+  if (profilePictureUrl) userData.profilePictureUrl = profilePictureUrl;
+
   const user = await prisma.user.create({
-    data: { email, password: hashedPassword, name: displayName, role: prismaRole, status },
+    data:   userData,
     select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
   });
 
@@ -53,40 +80,22 @@ async function register({ name, email, password, role }) {
     status: user.status,
   });
 
-  // Pending admin/lead accounts: return no token — they cannot log in until approved.
-  if (status === 'pending') {
-    return { pending: true, user: { email: user.email, role: user.role.toLowerCase() } };
-  }
-
-  // Auto-create an Intern record for intern-role users
-  if (prismaRole.includes('INTERN')) {
-    // Generate a simple slug from name: "John Doe" -> "john-doe"
+  // Auto-create Intern record for intern roles
+  if (isInternRole) {
     const baseSlug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
 
-    await prisma.intern.create({ 
-      data: { 
-        userId: user.id,
-        slug: slug
-      } 
+    await prisma.intern.create({
+      data: {
+        userId:  user.id,
+        slug:    slug,
+        gdocUrl: gdocUrl || null,
+      },
     });
   }
 
-  const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
-  );
-
-  return {
-    token,
-    user: {
-      id:    user.id,
-      name:  user.name,
-      email: user.email,
-      role:  user.role.toLowerCase(),
-    },
-  };
+  // All registrations are pending — return no token
+  return { pending: true, user: { email: user.email, role: user.role.toLowerCase(), name: user.name } };
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────

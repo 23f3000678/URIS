@@ -1,3 +1,4 @@
+const path = require('path');
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
@@ -26,6 +27,8 @@ const portfolioRoutes    = require('./src/routes/portfolio.routes.js');
 const analyticsRoutes    = require('./src/routes/analytics.routes');
 const governanceRoutes   = require('./src/routes/governance.routes');
 const workflowRoutes     = require('./src/routes/workflow.routes');
+const profileRoutes      = require('./src/routes/profile.routes');
+const googleRoutes       = require('./src/routes/google.routes');
 
 const healthRoutes       = require('./src/routes/health.routes');
 const webhookRoutes      = require('./src/routes/webhook.routes');
@@ -60,6 +63,12 @@ if (process.env.NODE_ENV === 'production' && !process.env.FRONTEND_URL) {
 // webhook request will be rejected with 500, silently breaking real-time sync.
 if (process.env.NODE_ENV === 'production' && !process.env.PLANE_WEBHOOK_SECRET) {
   throw new Error('PLANE_WEBHOOK_SECRET environment variable is not set. Server cannot start in production.');
+}
+
+// APP_BASE_URL must be set in production — without it profile picture URLs will
+// point to localhost and be broken for all users.
+if (process.env.NODE_ENV === 'production' && !process.env.APP_BASE_URL) {
+  throw new Error('APP_BASE_URL environment variable is not set. Server cannot start in production.');
 }
 
 // SCOPE NOTE: OpenProject integration is DESCOPED.
@@ -116,6 +125,7 @@ app.use('/availability', availabilityRoutes);
 app.use('/assign',       assignmentRoutes);
 app.use('/demo',         demoRoutes);
 app.use('/auth',         authRoutes);
+app.use('/auth',         googleRoutes);   // Google OAuth: /auth/google, /auth/google/callback
 app.use('/tasks',        taskRoutes);
 app.use('/credibility',  credibilityRoutes);
 app.use('/alerts',       alertRoutes);
@@ -136,6 +146,48 @@ app.use('/workflow',     workflowRoutes);
 app.use('/support',      supportRoutes);
 app.use('/operational',  operationalRoutes);
 app.use('/archive',      archiveRoutes);
+app.use('/profile',      profileRoutes);
+app.use('/google',       googleRoutes);   // Google data: /google/worklog, /google/calendar
+// Serve uploaded profile pictures
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ── TEMP: Email integration test route ───────────────────────────────────────
+// GET /test-email?to=you@example.com
+// Remove this route once Resend delivery is confirmed.
+app.get('/test-email', async (req, res) => {
+  const { sendEmail } = require('./src/services/email.service');
+  const to = req.query.to || process.env.SMTP_USER;
+
+  if (!to) {
+    return res.status(400).json({ success: false, error: 'Provide ?to=email or set SMTP_USER in env.' });
+  }
+
+  try {
+    const result = await sendEmail({
+      to,
+      templateName: 'task-assigned',
+      templateData: {
+        name:        'Test User',
+        taskTitle:   'URIS Email Integration Test',
+        taskDescription: 'This is a test email to verify Resend delivery and branded HTML rendering.',
+        complexity:  3,
+      },
+    });
+
+    if (result.success) {
+      logger.info({ to, id: result.id }, 'Test email sent successfully');
+      return res.json({ success: true, message: `Test email sent to ${to}`, id: result.id });
+    } else {
+      logger.warn({ to, result }, 'Test email failed');
+      return res.status(500).json({ success: false, error: result.error || result.reason, detail: result });
+    }
+  } catch (err) {
+    logger.error({ err }, 'Test email route threw unexpectedly');
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+// ── END TEMP ──────────────────────────────────────────────────────────────────
+
 app.use(errorHandler);
 
 const prisma    = require('./src/utils/prisma');
