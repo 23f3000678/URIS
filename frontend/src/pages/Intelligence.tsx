@@ -599,7 +599,7 @@ function DigestTab({ data }: { data: AnalyticsDashboard }) {
       <div className="grid grid-cols-3 gap-3">
         <StatCard icon={AlertTriangle} label="LOW CREDIBILITY"  value={digest.counts.lowCredibilityInterns} color={RED} />
         <StatCard icon={Clock}         label="INACTIVE TASKS"   value={digest.counts.inactiveTasks}         color={AMBER} />
-        <StatCard icon={Shield}        label="OVERDUE REQUESTS" value={digest.counts.overdueRequests}       color={RED} />
+        <StatCard icon={Clock}         label="OVERDUE REQUESTS" value={digest.counts.overdueRequests}       color={RED} />
       </div>
       {digest.lowCredibilityInterns.length > 0 && (
         <div className="glass-card rounded-sm p-5">
