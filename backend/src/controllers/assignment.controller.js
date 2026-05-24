@@ -5,6 +5,7 @@ const prisma = require('../utils/prisma');
 const { logAction } = require('../utils/auditLogger');
 const { AUDIT_ACTIONS, AUDIT_ENTITIES } = require('../constants/auditActions');
 const logger = require('../utils/logger');
+const notificationService = require('../services/notification.service');
 
 const MIN_CAPACITY_THRESHOLD = parseInt(process.env.MIN_CAPACITY_THRESHOLD) || 40;
 
@@ -135,6 +136,25 @@ async function assignTask(req, res, next) {
       taskId,
       internId,
       previousInternId: task.internId ?? null,
+    });
+
+    // Fire-and-forget email — fetch intern's user email for notification
+    setImmediate(async () => {
+      try {
+        const intern = await prisma.intern.findUnique({
+          where:   { id: internId },
+          include: { user: { select: { email: true, name: true } } },
+        });
+        if (intern?.user?.email) {
+          await notificationService.notifyTaskAssigned(
+            intern.user.email,
+            intern.user.name || intern.user.email.split('@')[0],
+            task.title,
+          );
+        }
+      } catch (emailErr) {
+        logger.warn({ emailErr, internId, taskId }, 'Task assignment email failed — non-fatal');
+      }
     });
 
     return ok(res, null, 'Task assigned successfully');

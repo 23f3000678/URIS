@@ -25,6 +25,7 @@ import Profile            from './pages/Profile'
 import Settings           from './pages/Settings'
 import ForgotPassword     from './pages/ForgotPassword'
 import ResetPassword      from './pages/ResetPassword'
+import Integrations       from './pages/Integrations'
 import { useAuthStore, selectIsAuthenticated, selectIsAdmin } from './store/authStore'
 import { useAlertStore } from './store/alertStore'
 import { ROLES } from './constants/roles'
@@ -115,6 +116,8 @@ export default function App() {
             element={<ProtectedRoute allowRoles={CORE_ADMIN_ONLY}><Governance /></ProtectedRoute>} />
           <Route path="/audit-logs"
             element={<ProtectedRoute allowRoles={CORE_ADMIN_ONLY}><AuditLogs /></ProtectedRoute>} />
+          <Route path="/integrations"
+            element={<ProtectedRoute allowRoles={CORE_ADMIN_ONLY}><Integrations /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />

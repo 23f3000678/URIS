@@ -171,4 +171,140 @@ router.get('/', async (req, res) => {
   });
 });
 
+/**
+ * GET /health/integrations
+ *
+ * Structured integration audit for the admin Integration Status panel.
+ * Returns per-integration status, env var presence, and operational notes.
+ * No auth required — status data only, no secrets exposed.
+ */
+router.get('/integrations', async (req, res) => {
+  const [db, nextcloud, plane] = await Promise.all([
+    checkDatabase(),
+    checkNextcloud(),
+    checkPlane(),
+  ]);
+
+  // Google: check env vars + DB token count
+  let googleTokenCount = 0;
+  let googleDbOk = true;
+  try {
+    googleTokenCount = await prisma.googleToken.count();
+  } catch {
+    googleDbOk = false;
+  }
+
+  const googleEnvOk = !!(
+    process.env.GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_SECRET &&
+    process.env.GOOGLE_REDIRECT_URI
+  );
+
+  // Resend: check env var presence only (can't ping without sending)
+  const resendEnvOk = !!process.env.RESEND_API_KEY;
+  const resendFromOk = !!(process.env.RESEND_FROM || process.env.SMTP_FROM);
+
+  // Plane: env vars
+  const planeEnvOk = !!(
+    process.env.PLANE_BASE_URL &&
+    process.env.PLANE_API_KEY &&
+    process.env.PLANE_WORKSPACE_SLUG &&
+    process.env.PLANE_PROJECT_ID
+  );
+
+  // Nextcloud: env vars
+  const nextcloudEnvOk = !!(
+    process.env.NEXTCLOUD_URL &&
+    process.env.NEXTCLOUD_USERNAME &&
+    process.env.NEXTCLOUD_PASSWORD
+  );
+
+  // Last Plane sync — most recent SyncLog entry
+  let lastSync = null;
+  let syncLogCount = 0;
+  try {
+    const latest = await prisma.syncLog.findFirst({ orderBy: { createdAt: 'desc' } });
+    lastSync = latest?.createdAt ?? null;
+    syncLogCount = await prisma.syncLog.count();
+  } catch { /* graceful */ }
+
+  // Task count (Plane-synced)
+  let taskCount = 0;
+  try { taskCount = await prisma.task.count(); } catch { /* graceful */ }
+
+  const integrations = [
+    {
+      id:          'google',
+      name:        'Google (Drive · Docs · Calendar)',
+      status:      googleEnvOk && googleDbOk ? 'connected' : googleEnvOk ? 'partial' : 'not_configured',
+      envOk:       googleEnvOk,
+      operational: googleEnvOk && googleDbOk,
+      notes:       googleEnvOk
+        ? `${googleTokenCount} user${googleTokenCount !== 1 ? 's' : ''} connected`
+        : 'GOOGLE_CLIENT_ID / SECRET / REDIRECT_URI missing',
+      features:    ['OAuth flow', 'Drive metadata', 'Drive Activity', 'Calendar busy slots', 'GDoc stale detection', 'Cron refresh (6h)'],
+      frontendVisible: true,
+    },
+    {
+      id:          'resend',
+      name:        'Resend Email',
+      status:      resendEnvOk && resendFromOk ? 'connected' : resendEnvOk ? 'partial' : 'not_configured',
+      envOk:       resendEnvOk,
+      operational: resendEnvOk,
+      notes:       resendEnvOk
+        ? `Sender: ${process.env.RESEND_FROM || process.env.SMTP_FROM || 'not set'}`
+        : 'RESEND_API_KEY missing',
+      features:    ['Password reset', 'Password changed', 'Account approved', 'Task assigned', 'GDoc reminder', 'Operational alerts'],
+      frontendVisible: false,
+    },
+    {
+      id:          'plane',
+      name:        'Plane.so Task Sync',
+      status:      plane.ok ? 'connected' : planeEnvOk ? 'partial' : 'not_configured',
+      envOk:       planeEnvOk,
+      operational: plane.ok,
+      notes:       plane.ok
+        ? `${taskCount} tasks synced · Last sync: ${lastSync ? new Date(lastSync).toLocaleString('en-GB') : 'never'}`
+        : plane.reason ?? 'unreachable',
+      features:    ['Webhook (issue.created/updated)', '15-min cron sync', 'HMAC signature verification', 'Single-issue sync'],
+      frontendVisible: false,
+    },
+    {
+      id:          'nextcloud',
+      name:        'Nextcloud WebDAV',
+      status:      nextcloud.ok ? 'connected' : nextcloudEnvOk ? 'partial' : 'not_configured',
+      envOk:       nextcloudEnvOk,
+      operational: nextcloud.ok,
+      notes:       nextcloud.ok
+        ? `${syncLogCount} sync log entries`
+        : nextcloudEnvOk ? (nextcloud.reason ?? 'unreachable') : 'NEXTCLOUD_URL / USERNAME / PASSWORD missing',
+      features:    ['WebDAV PUT upload', 'Retry with backoff', 'Sync log tracking', 'Test route: /nextcloud/test-nextcloud'],
+      frontendVisible: false,
+    },
+    {
+      id:          'database',
+      name:        'PostgreSQL (Neon)',
+      status:      db.ok ? 'connected' : 'failed',
+      envOk:       !!process.env.DATABASE_URL,
+      operational: db.ok,
+      notes:       db.ok ? 'Prisma ORM · Connected' : db.reason ?? 'disconnected',
+      features:    ['Prisma ORM', 'Connection pooling', 'All models'],
+      frontendVisible: false,
+    },
+  ];
+
+  const overallStatus = integrations.every(i => i.operational)
+    ? 'all_operational'
+    : integrations.some(i => i.status === 'failed')
+      ? 'degraded'
+      : 'partial';
+
+  return res.json({
+    status:       overallStatus,
+    timestamp:    new Date().toISOString(),
+    uptime:       process.uptime(),
+    integrations,
+  });
+});
+
 module.exports = router;

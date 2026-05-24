@@ -14,7 +14,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: true,
     canAssign: 'YES',
     canReview: 'YES',
-    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/admin', '/intelligence', '/governance', '/audit-logs', '/profile', '/settings']
+    modules: ['/dashboard', '/tasks', '/review', '/team', '/alerts', '/admin', '/intelligence', '/governance', '/audit-logs', '/integrations', '/profile', '/settings']
   },
   'operations_lead': {
     canSeeAllTasks: 'LIMITED',

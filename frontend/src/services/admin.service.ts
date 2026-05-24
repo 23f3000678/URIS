@@ -62,3 +62,31 @@ export async function approveUser(userId: string): Promise<void> {
 export async function finishInternship(internId: string): Promise<void> {
   await api.post('/admin/finish-internship', { internId })
 }
+
+// ── Integration Status ────────────────────────────────────────────────────────
+
+export interface IntegrationInfo {
+  id: string
+  name: string
+  status: 'connected' | 'partial' | 'not_configured' | 'failed'
+  envOk: boolean
+  operational: boolean
+  notes: string
+  features: string[]
+  frontendVisible: boolean
+}
+
+export interface IntegrationAudit {
+  status: 'all_operational' | 'degraded' | 'partial'
+  timestamp: string
+  uptime: number
+  integrations: IntegrationInfo[]
+}
+
+export async function getIntegrationStatus(): Promise<IntegrationAudit> {
+  // Use fetch directly — no auth needed, public health endpoint
+  const base = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
+  const res = await fetch(`${base}/health/integrations`)
+  if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
+  return res.json()
+}

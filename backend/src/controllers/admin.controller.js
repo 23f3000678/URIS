@@ -9,6 +9,7 @@ const { invalidateCache } = require('../middleware/ipBlock.middleware');
 const configStore = require('../services/configStore');
 const { getCapacityLabel } = require('../services/capacityEngine');
 const { getRpiWindowStart } = require('../services/performanceEngine');
+const notificationService = require('../services/notification.service');
 
 // Default deadline: Monday at 11:00 AM
 const DEFAULT_DEADLINE = { day: 1, hour: 11, minute: 0 }; // day: 0=Sun,1=Mon,...6=Sat
@@ -338,6 +339,9 @@ async function approveUser(req, res, next) {
       approvedEmail: user.email,
       approvedRole:  user.role,
     });
+
+    // Fire-and-forget — email failure must not block the approval response
+    void notificationService.notifyAccountApproved(user.email, user.name || user.email.split('@')[0]);
 
     return ok(res, null, `User ${user.email} approved successfully`);
   } catch (err) {
