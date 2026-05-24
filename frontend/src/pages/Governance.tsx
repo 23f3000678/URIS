@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield, CheckCircle, X, Clock, Loader2, AlertTriangle,
-  ChevronDown, ChevronUp, Key, Users, TrendingUp, Lock,
+  ChevronDown, ChevronUp, Key, Users, TrendingUp, Lock, Edit2, Save, RotateCcw,
 } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
@@ -10,7 +10,7 @@ import { useAuthStore, selectUser } from '../store/authStore'
 import { ROLES } from '../constants/roles'
 import {
   listApprovals, approveRequest, rejectRequest, cancelApprovalRequest,
-  getMyPermissions, getAllUsers, getRoleHistory, getAccessMatrix, getSecurityOverview,
+  getMyPermissions, getAllUsers, getRoleHistory, getAccessMatrix, updateAccessMatrix, getSecurityOverview,
   submitPromotionRequest,
   type ApprovalRequest, type PermissionsResponse,
   type GovernanceUser, type RoleHistoryRecord, type AccessMatrixResponse, type SecurityOverview,
@@ -406,8 +406,12 @@ function RoleHistoryTab({ records }: { records: RoleHistoryRecord[] }) {
 }
 
 // ── Access Matrix Tab ─────────────────────────────────────────────────────────
-function AccessMatrixTab({ matrix }: { matrix: AccessMatrixResponse | null }) {
+function AccessMatrixTab({ matrix, onSave }: { matrix: AccessMatrixResponse | null; onSave: (overrides: Record<string, string[]>) => Promise<void> }) {
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
+  const [editMode, setEditMode]         = useState(false)
+  const [editPerms, setEditPerms]       = useState<Record<string, string[]>>({})
+  const [saving, setSaving]             = useState(false)
+  const [saveMsg, setSaveMsg]           = useState<{ ok: boolean; text: string } | null>(null)
 
   if (!matrix) return <div className="flex justify-center py-16"><Loader2 size={20} className="animate-spin" style={{ color: GOLD }} /></div>
 
@@ -423,29 +427,110 @@ function AccessMatrixTab({ matrix }: { matrix: AccessMatrixResponse | null }) {
     'CAN_VIEW_AUDIT_LOGS', 'CAN_MANAGE_IP_BLOCKS', 'CAN_VIEW_LOGIN_LOGS',
   ]
 
+  function enterEditMode() {
+    // Seed edit state from current matrix
+    const seed: Record<string, string[]> = {}
+    for (const r of matrix.matrix) {
+      seed[r.role] = [...r.permissions]
+    }
+    setEditPerms(seed)
+    setEditMode(true)
+    setSaveMsg(null)
+  }
+
+  function cancelEdit() {
+    setEditMode(false)
+    setEditPerms({})
+    setSaveMsg(null)
+  }
+
+  function togglePerm(role: string, perm: string) {
+    setEditPerms(prev => {
+      const current = prev[role] ?? []
+      const has = current.includes(perm)
+      return {
+        ...prev,
+        [role]: has ? current.filter(p => p !== perm) : [...current, perm],
+      }
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setSaveMsg(null)
+    try {
+      await onSave(editPerms)
+      setSaveMsg({ ok: true, text: 'Permissions saved successfully.' })
+      setEditMode(false)
+    } catch (err: unknown) {
+      setSaveMsg({ ok: false, text: extractErrorMessage(err, 'Failed to save permissions.') })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filteredMatrix = matrix.matrix.filter(r => r.role !== 'PAST_EMPLOYEE')
+
   return (
     <div className="space-y-6">
-      {/* Role selector */}
-      <div className="glass-card rounded-sm p-5">
-        <p className="nav-label text-[0.55rem] mb-3" style={{ color: `${GOLD}66` }}>SELECT ROLE TO INSPECT</p>
-        <div className="flex flex-wrap gap-2">
-          {matrix.matrix.filter(r => r.role !== 'PAST_EMPLOYEE').map(r => (
-            <button key={r.role} onClick={() => setSelectedRole(r.role === selectedRole ? null : r.role)}
-              className="px-3 py-1.5 rounded-sm nav-label text-[0.55rem] transition-all"
-              style={{
-                background: selectedRole === r.role ? 'rgba(201,168,76,0.15)' : 'rgba(13,15,28,0.6)',
-                border: `1px solid ${selectedRole === r.role ? 'rgba(201,168,76,0.4)' : 'rgba(201,168,76,0.1)'}`,
-                color: selectedRole === r.role ? GOLD : ICE_DIM,
-              }}>
-              {r.role.replace(/_/g, ' ')}
-              <span className="ml-1.5 opacity-60">({r.permissions.length})</span>
-            </button>
-          ))}
+      {/* Header with edit toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="nav-label text-[0.55rem]" style={{ color: `${GOLD}66` }}>ROLE PERMISSION MATRIX</p>
+          <p className="font-body text-xs mt-0.5" style={{ color: ICE_DIM }}>
+            {editMode ? 'Click any cell to toggle a permission on or off.' : 'Select a role to inspect its permissions, or enter edit mode to modify them.'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {editMode ? (
+            <>
+              <motion.button whileHover={{ scale: 1.03 }} onClick={cancelEdit} disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem] disabled:opacity-50"
+                style={{ background: 'rgba(184,212,240,0.08)', border: '1px solid rgba(184,212,240,0.2)', color: ICE_DIM }}>
+                <RotateCcw size={11} /> CANCEL
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.03 }} onClick={handleSave} disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem] disabled:opacity-50"
+                style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', color: GREEN }}>
+                {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                SAVE CHANGES
+              </motion.button>
+            </>
+          ) : (
+            <motion.button whileHover={{ scale: 1.03 }} onClick={enterEditMode}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem]"
+              style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.3)', color: GOLD }}>
+              <Edit2 size={11} /> EDIT PERMISSIONS
+            </motion.button>
+          )}
         </div>
       </div>
 
-      {/* Role detail */}
-      {roleData && (
+      {saveMsg && <FeedbackBanner ok={saveMsg.ok} text={saveMsg.text} />}
+
+      {/* Role selector (view mode only) */}
+      {!editMode && (
+        <div className="glass-card rounded-sm p-5">
+          <p className="nav-label text-[0.55rem] mb-3" style={{ color: `${GOLD}66` }}>SELECT ROLE TO INSPECT</p>
+          <div className="flex flex-wrap gap-2">
+            {filteredMatrix.map(r => (
+              <button key={r.role} onClick={() => setSelectedRole(r.role === selectedRole ? null : r.role)}
+                className="px-3 py-1.5 rounded-sm nav-label text-[0.55rem] transition-all"
+                style={{
+                  background: selectedRole === r.role ? 'rgba(201,168,76,0.15)' : 'rgba(13,15,28,0.6)',
+                  border: `1px solid ${selectedRole === r.role ? 'rgba(201,168,76,0.4)' : 'rgba(201,168,76,0.1)'}`,
+                  color: selectedRole === r.role ? GOLD : ICE_DIM,
+                }}>
+                {r.role.replace(/_/g, ' ')}
+                <span className="ml-1.5 opacity-60">({r.permissions.length})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Role detail (view mode) */}
+      {!editMode && roleData && (
         <div className="glass-card rounded-sm p-5">
           <div className="mb-4">
             <RoleBadge role={roleData.role.toLowerCase()} />
@@ -472,8 +557,68 @@ function AccessMatrixTab({ matrix }: { matrix: AccessMatrixResponse | null }) {
         </div>
       )}
 
-      {/* Summary matrix — key permissions across all roles */}
-      {!selectedRole && (
+      {/* Edit mode — full interactive matrix */}
+      {editMode && (
+        <div className="glass-card rounded-sm p-5">
+          <p className="nav-label text-[0.55rem] mb-4" style={{ color: `${GOLD}66` }}>EDIT PERMISSIONS — CLICK TO TOGGLE</p>
+          <div className="overflow-x-auto">
+            <table className="uris-table w-full text-center" style={{ minWidth: '700px' }}>
+              <thead>
+                <tr>
+                  <th className="text-left sticky left-0" style={{ background: 'rgba(13,15,28,0.95)', minWidth: '200px' }}>Permission</th>
+                  {filteredMatrix.map(r => (
+                    <th key={r.role} className="text-center" style={{ minWidth: '80px' }}>
+                      <span className="nav-label text-[0.45rem]" style={{ color: ICE_DIM }}>
+                        {r.role.replace(/_/g, ' ').split(' ').map((w: string) => w[0]).join('')}
+                      </span>
+                      <span className="block nav-label text-[0.4rem] mt-0.5" style={{ color: `${ICE_DIM}88` }}>
+                        {r.role.replace(/_/g, ' ').split(' ')[0]}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.allPermissions.sort().map(p => (
+                  <tr key={p}>
+                    <td className="text-left nav-label text-[0.5rem] sticky left-0" style={{ background: 'rgba(13,15,28,0.95)', color: ICE_DIM }}>
+                      {p.replace(/^CAN_/, '').replace(/_/g, ' ')}
+                    </td>
+                    {filteredMatrix.map(r => {
+                      const has = (editPerms[r.role] ?? r.permissions).includes(p)
+                      return (
+                        <td key={r.role}>
+                          <motion.button
+                            whileHover={{ scale: 1.2 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => togglePerm(r.role, p)}
+                            className="w-6 h-6 rounded-sm flex items-center justify-center mx-auto transition-all"
+                            style={{
+                              background: has ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.08)',
+                              border: `1px solid ${has ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.2)'}`,
+                              cursor: 'pointer',
+                            }}
+                            title={`${has ? 'Revoke' : 'Grant'} ${p} for ${r.role}`}>
+                            {has
+                              ? <CheckCircle size={10} style={{ color: GREEN }} />
+                              : <X size={10} style={{ color: 'rgba(248,113,113,0.5)' }} />}
+                          </motion.button>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="nav-label text-[0.45rem] mt-4" style={{ color: `${ICE_DIM}66` }}>
+            Column abbreviations: CA=CORE_ADMIN · TL=TECHNICAL_LEAD · OL=OPERATIONS_LEAD · RL=RESEARCH_LEAD · OPM=OPERATIONS_PROGRAM_MANAGER · TI=TECHNICAL_INTERN · OI=OPERATIONS_INTERN · RI=RESEARCH_INTERN · OTL=OBSERVER_TEAM_LEAD · CL=COLLABORATOR_LEAD · OM=ORENDA_MEMBER
+          </p>
+        </div>
+      )}
+
+      {/* Summary matrix (view mode, no role selected) */}
+      {!editMode && !selectedRole && (
         <div className="glass-card rounded-sm p-5">
           <p className="nav-label text-[0.55rem] mb-4" style={{ color: `${GOLD}66` }}>KEY PERMISSIONS MATRIX</p>
           <div className="overflow-x-auto">
@@ -481,10 +626,10 @@ function AccessMatrixTab({ matrix }: { matrix: AccessMatrixResponse | null }) {
               <thead>
                 <tr>
                   <th className="text-left">Permission</th>
-                  {matrix.matrix.filter(r => r.role !== 'PAST_EMPLOYEE').map(r => (
+                  {filteredMatrix.map(r => (
                     <th key={r.role} className="text-center">
                       <span className="nav-label text-[0.45rem]" style={{ color: ICE_DIM }}>
-                        {r.role.replace(/_/g, ' ').split(' ').map(w => w[0]).join('')}
+                        {r.role.replace(/_/g, ' ').split(' ').map((w: string) => w[0]).join('')}
                       </span>
                     </th>
                   ))}
@@ -494,7 +639,7 @@ function AccessMatrixTab({ matrix }: { matrix: AccessMatrixResponse | null }) {
                 {KEY_PERMS.map(p => (
                   <tr key={p}>
                     <td className="text-left nav-label text-[0.5rem]" style={{ color: ICE_DIM }}>{p.replace(/^CAN_/, '').replace(/_/g, ' ')}</td>
-                    {matrix.matrix.filter(r => r.role !== 'PAST_EMPLOYEE').map(r => (
+                    {filteredMatrix.map(r => (
                       <td key={r.role}>
                         {r.permissions.includes(p)
                           ? <CheckCircle size={10} style={{ color: GREEN, margin: 'auto' }} />
@@ -732,6 +877,13 @@ export default function Governance() {
     setPending(updated.requests)
   }
 
+  async function handleSaveMatrix(overrides: Record<string, string[]>) {
+    await updateAccessMatrix(overrides)
+    // Refresh the matrix so the UI reflects the saved state
+    const updated = await getAccessMatrix()
+    setAccessMatrix(updated)
+  }
+
   const TABS: { key: Tab; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
     { key: 'approvals',     label: 'APPROVALS',     icon: CheckCircle, },
     { key: 'promotions',    label: 'PROMOTIONS',     icon: TrendingUp,  adminOnly: true },
@@ -789,7 +941,7 @@ export default function Governance() {
                 {tab === 'promotions'    && <PromotionsTab users={users} onSubmit={handlePromotion} />}
                 {tab === 'users'         && <UsersTab users={users} />}
                 {tab === 'role-history'  && <RoleHistoryTab records={roleHistory} />}
-                {tab === 'access-matrix' && <AccessMatrixTab matrix={accessMatrix} />}
+                {tab === 'access-matrix' && <AccessMatrixTab matrix={accessMatrix} onSave={handleSaveMatrix} />}
                 {tab === 'security'      && <SecurityTab security={security} />}
                 {tab === 'permissions'   && <PermissionsTab perms={perms} />}
               </motion.div>

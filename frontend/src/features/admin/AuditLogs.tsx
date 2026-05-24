@@ -9,23 +9,90 @@ import { extractErrorMessage } from '../../services/error'
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ACTION_OPTIONS = [
+  // Auth
   'LOGIN', 'REGISTER', 'LOGOUT',
-  'CREATE_TASK', 'UPDATE_TASK', 'ASSIGN_TASK',
-  'OVERRIDE_SCORE', 'SUBMIT_REVIEW', 'RESOLVE_ALERT',
+  // Tasks
+  'CREATE_TASK', 'UPDATE_TASK', 'DELETE_TASK', 'ASSIGN_TASK', 'INTERN_UPDATE_TASK',
+  // Scores & Reviews
+  'OVERRIDE_SCORE', 'SUBMIT_REVIEW',
+  // Alerts
+  'RESOLVE_ALERT',
+  // User lifecycle
+  'APPROVE_USER', 'REJECT_USER', 'FINISH_INTERNSHIP', 'DELETE_INTERN', 'UPDATE_INTERN',
+  'DEACTIVATE_USER', 'ARCHIVE_USER', 'RESTORE_USER', 'MARK_USER_REMOVED',
+  // Roles & Permissions
+  'CHANGE_USER_ROLE', 'UPDATE_ACCESS_MATRIX',
+  // Governance & Approvals
+  'REQUEST_APPROVAL', 'APPROVE_ACTION', 'REJECT_ACTION', 'CANCEL_APPROVAL', 'EXECUTE_APPROVED_ACTION',
+  // Security
+  'BLOCK_IP', 'UNBLOCK_IP',
+  // Config
+  'SET_AVAILABILITY_DEADLINE',
+  // Profile & Password
+  'PROFILE_UPDATE', 'PASSWORD_CHANGED', 'PASSWORD_RESET',
+  // Workflow
+  'ADD_TASK_NOTE', 'UPDATE_TASK_NOTE', 'DELETE_TASK_NOTE',
+  'RAISE_ESCALATION', 'ACKNOWLEDGE_ESCALATION', 'RESOLVE_ESCALATION',
+  'ADD_TASK_COLLABORATOR', 'REMOVE_TASK_COLLABORATOR', 'ADD_TASK_OBSERVER', 'REMOVE_TASK_OBSERVER',
+  // Support
+  'CREATE_SUPPORT_REQUEST', 'ASSIGN_SUPPORT_REQUEST', 'UPDATE_SUPPORT_REQUEST_STATUS',
+  // Access denied
+  'PERMISSION_DENIED', 'UNAUTHORIZED_ACCESS',
 ]
 
-const ENTITY_OPTIONS = ['USER', 'TASK', 'SCORE', 'REVIEW', 'ALERT']
+const ENTITY_OPTIONS = ['USER', 'TASK', 'SCORE', 'REVIEW', 'ALERT', 'APPROVAL', 'CONFIG', 'INTERN', 'SUPPORT', 'SYSTEM']
 
 const ACTION_COLORS: Record<string, string> = {
-  LOGIN:          '#4ade80',
-  REGISTER:       '#4ade80',
-  LOGOUT:         '#b8d4f0',
-  CREATE_TASK:    '#c9a84c',
-  UPDATE_TASK:    '#c9a84c',
-  ASSIGN_TASK:    '#c9a84c',
+  // Auth — green
+  LOGIN:    '#4ade80',
+  REGISTER: '#4ade80',
+  LOGOUT:   '#b8d4f0',
+  // Tasks — gold
+  CREATE_TASK:        '#c9a84c',
+  UPDATE_TASK:        '#c9a84c',
+  DELETE_TASK:        '#f87171',
+  ASSIGN_TASK:        '#e2c76e',
+  INTERN_UPDATE_TASK: '#c9a84c',
+  // Scores & Reviews — purple
   OVERRIDE_SCORE: '#f59e0b',
   SUBMIT_REVIEW:  '#a78bfa',
-  RESOLVE_ALERT:  '#34d399',
+  // Alerts
+  RESOLVE_ALERT: '#34d399',
+  // User lifecycle — red/amber
+  APPROVE_USER:      '#4ade80',
+  REJECT_USER:       '#f87171',
+  FINISH_INTERNSHIP: '#f59e0b',
+  DELETE_INTERN:     '#f87171',
+  UPDATE_INTERN:     '#c9a84c',
+  DEACTIVATE_USER:   '#f59e0b',
+  ARCHIVE_USER:      '#f87171',
+  RESTORE_USER:      '#4ade80',
+  MARK_USER_REMOVED: '#f87171',
+  // Roles & Permissions — blue
+  CHANGE_USER_ROLE:    '#60a5fa',
+  UPDATE_ACCESS_MATRIX:'#60a5fa',
+  // Governance — blue
+  REQUEST_APPROVAL:        '#60a5fa',
+  APPROVE_ACTION:          '#4ade80',
+  REJECT_ACTION:           '#f87171',
+  CANCEL_APPROVAL:         '#b8d4f0',
+  EXECUTE_APPROVED_ACTION: '#4ade80',
+  // Security — red
+  BLOCK_IP:   '#f87171',
+  UNBLOCK_IP: '#4ade80',
+  // Config
+  SET_AVAILABILITY_DEADLINE: '#c9a84c',
+  // Profile
+  PROFILE_UPDATE:   '#b8d4f0',
+  PASSWORD_CHANGED: '#f59e0b',
+  PASSWORD_RESET:   '#f59e0b',
+  // Workflow
+  ADD_TASK_NOTE:    '#b8d4f0',
+  RAISE_ESCALATION: '#f59e0b',
+  RESOLVE_ESCALATION: '#4ade80',
+  // Access denied — red
+  PERMISSION_DENIED:   '#f87171',
+  UNAUTHORIZED_ACCESS: '#f87171',
 }
 
 const PAGE_SIZE = 25
@@ -56,6 +123,7 @@ export default function AuditLogs() {
   // Filters
   const [actionFilter, setActionFilter] = useState('')
   const [entityFilter, setEntityFilter] = useState('')
+  const [emailFilter, setEmailFilter]   = useState('')
   const [fromDate, setFromDate]         = useState('')
   const [toDate, setToDate]             = useState('')
   const [page, setPage]                 = useState(1)
@@ -80,22 +148,24 @@ export default function AuditLogs() {
     void fetchLogs({
       action: actionFilter || undefined,
       entity: entityFilter || undefined,
+      email:  emailFilter  || undefined,
       from:   fromDate     || undefined,
       to:     toDate       || undefined,
       page,
       limit:  PAGE_SIZE,
     })
-  }, [fetchLogs, actionFilter, entityFilter, fromDate, toDate, page])
+  }, [fetchLogs, actionFilter, entityFilter, emailFilter, fromDate, toDate, page])
 
   const clearFilters = (): void => {
     setActionFilter('')
     setEntityFilter('')
+    setEmailFilter('')
     setFromDate('')
     setToDate('')
     setPage(1)
   }
 
-  const hasFilters = !!(actionFilter || entityFilter || fromDate || toDate)
+  const hasFilters = !!(actionFilter || entityFilter || emailFilter || fromDate || toDate)
 
   return (
     <div className="min-h-screen bg-navy-950 text-frost">
@@ -135,7 +205,7 @@ export default function AuditLogs() {
                 </motion.button>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {/* Action filter */}
               <div>
                 <label className="nav-label text-[0.55rem] text-gold/40 block mb-1.5">ACTION</label>
@@ -143,7 +213,7 @@ export default function AuditLogs() {
                   onChange={e => { setActionFilter(e.target.value); setPage(1) }}>
                   <option value="">All actions</option>
                   {ACTION_OPTIONS.map(a => (
-                    <option key={a} value={a}>{a}</option>
+                    <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>
                   ))}
                 </select>
               </div>
@@ -158,6 +228,14 @@ export default function AuditLogs() {
                     <option key={e} value={e}>{e}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Email filter */}
+              <div>
+                <label className="nav-label text-[0.55rem] text-gold/40 block mb-1.5">ACTOR EMAIL</label>
+                <input type="text" className="uris-input text-sm" placeholder="Search by email..."
+                  value={emailFilter}
+                  onChange={e => { setEmailFilter(e.target.value); setPage(1) }} />
               </div>
 
               {/* From date */}
@@ -262,13 +340,13 @@ export default function AuditLogs() {
 
                           {/* User */}
                           <div className="col-span-3">
-                            {log.userName ? (
+                            {log.userEmail ? (
                               <>
-                                <span className="font-body text-xs text-frost/70 truncate block">
-                                  {log.userName.split('@')[0]}
+                                <span className="font-body text-xs text-frost/80 truncate block font-medium">
+                                  {log.userDisplayName || log.userEmail.split('@')[0]}
                                 </span>
-                                <span className="font-mono text-[0.5rem] text-ice/25 truncate block">
-                                  {log.userName}
+                                <span className="font-mono text-[0.5rem] text-ice/35 truncate block">
+                                  {log.userEmail}
                                 </span>
                               </>
                             ) : (

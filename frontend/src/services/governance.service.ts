@@ -146,6 +146,10 @@ export function getAccessMatrix(): Promise<AccessMatrixResponse> {
   return wrap(api.get('/governance/access-matrix'))
 }
 
+export function updateAccessMatrix(overrides: Record<string, string[]>): Promise<{ overrides: Record<string, string[]> }> {
+  return wrap(api.put('/governance/access-matrix', { overrides }))
+}
+
 // ── Security overview ─────────────────────────────────────────────────────────
 
 export interface BlockedIPRecord {

@@ -132,7 +132,7 @@ async function getPermissionsForRoleEndpoint(req, res) {
   return ok(res, { role, permissions }, 'Role permissions fetched.');
 }
 
-module.exports = { list, request, approve, reject, cancel, getMyPermissions, getPermissionsForRoleEndpoint, getAllUsers, getRoleHistory, getAccessMatrix, getSecurityOverview };
+module.exports = { list, request, approve, reject, cancel, getMyPermissions, getPermissionsForRoleEndpoint, getAllUsers, getRoleHistory, getAccessMatrix, updateAccessMatrix, getSecurityOverview };
 
 // ── GET /governance/users ─────────────────────────────────────────────────────
 
@@ -192,14 +192,20 @@ async function getRoleHistory(req, res, next) {
 async function getAccessMatrix(req, res) {
   const { ROLES } = require('../constants/roles');
   const { getPermissionsForRole, PERMISSION_ROLES } = require('../constants/permissions');
+  const configStore = require('../services/configStore');
 
   const allRoles = Object.values(ROLES);
   const allPermissions = Object.keys(PERMISSION_ROLES);
 
-  const matrix = allRoles.map(role => ({
-    role,
-    permissions: getPermissionsForRole(role),
-  }));
+  // Load any saved overrides from the Config table
+  const overrides = (await configStore.get('permission_overrides', {})) || {};
+
+  const matrix = allRoles.map(role => {
+    const base = getPermissionsForRole(role);
+    // If this role has overrides, use them; otherwise use the hardcoded defaults
+    const permissions = overrides[role] !== undefined ? overrides[role] : base;
+    return { role, permissions };
+  });
 
   return ok(res, { matrix, allPermissions }, 'Access matrix fetched.');
 }
@@ -267,3 +273,52 @@ async function getSecurityOverview(req, res, next) {
   } catch (err) { next(err); }
 }
 
+
+// ── PUT /governance/access-matrix ────────────────────────────────────────────
+
+async function updateAccessMatrix(req, res, next) {
+  try {
+    const { overrides } = req.body;
+    // overrides: { [role]: string[] } — maps each role to its new permission list
+
+    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+      return validationError(res, 'overrides must be an object mapping role -> permissions[]');
+    }
+
+    const { ROLES } = require('../constants/roles');
+    const { PERMISSION_ROLES } = require('../constants/permissions');
+    const configStore = require('../services/configStore');
+    const { logAction } = require('../utils/auditLogger');
+
+    const validRoles = new Set(Object.values(ROLES));
+    const validPerms = new Set(Object.keys(PERMISSION_ROLES));
+
+    // Validate all roles and permissions in the payload
+    for (const [role, perms] of Object.entries(overrides)) {
+      if (!validRoles.has(role)) {
+        return validationError(res, `Invalid role: "${role}"`);
+      }
+      if (!Array.isArray(perms)) {
+        return validationError(res, `Permissions for role "${role}" must be an array`);
+      }
+      for (const p of perms) {
+        if (!validPerms.has(p)) {
+          return validationError(res, `Invalid permission: "${p}"`);
+        }
+      }
+    }
+
+    // Merge with existing overrides (don't wipe roles not included in this request)
+    const existing = (await configStore.get('permission_overrides', {})) || {};
+    const merged = { ...existing, ...overrides };
+    await configStore.set('permission_overrides', merged);
+
+    void logAction(req.user?.id ?? null, 'UPDATE_ACCESS_MATRIX', 'SYSTEM', null, {
+      updatedRoles: Object.keys(overrides),
+    });
+
+    return ok(res, { overrides: merged }, 'Access matrix updated successfully.');
+  } catch (err) {
+    next(err);
+  }
+}

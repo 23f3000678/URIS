@@ -17,6 +17,7 @@ const {
   getAllUsers,
   getRoleHistory,
   getAccessMatrix,
+  updateAccessMatrix,
   getSecurityOverview,
 } = require('../controllers/approval.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
@@ -43,6 +44,7 @@ router.get('/role-history',             ...adminOnly, getRoleHistory);
 
 // ── Access matrix ─────────────────────────────────────────────────────────────
 router.get('/access-matrix',            verifyToken, requireRole(ROLES.CORE_ADMIN), getAccessMatrix);
+router.put('/access-matrix',            ...adminOnly, updateAccessMatrix);
 
 // ── Security oversight ────────────────────────────────────────────────────────
 router.get('/security',                 ...adminOnly, getSecurityOverview);

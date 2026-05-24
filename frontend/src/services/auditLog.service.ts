@@ -5,14 +5,16 @@
 import api from './api'
 
 export interface AuditLog {
-  id:        string
-  userId:    string | null
-  userName:  string | null   // resolved email/name from backend
-  action:    string
-  entity:    string
-  entityId:  string | null
-  metadata:  Record<string, unknown> | null
-  createdAt: string
+  id:              string
+  userId:          string | null
+  userName:        string | null   // email (for backward compat)
+  userEmail:       string | null   // explicit email field
+  userDisplayName: string | null   // human name
+  action:          string
+  entity:          string
+  entityId:        string | null
+  metadata:        Record<string, unknown> | null
+  createdAt:       string
 }
 
 export interface AuditLogMeta {
@@ -25,6 +27,7 @@ export interface AuditLogMeta {
 export interface AuditLogFilters {
   action?: string
   entity?: string
+  email?:  string   // filter by actor email
   from?:   string   // ISO date string
   to?:     string   // ISO date string
   page?:   number
@@ -40,6 +43,7 @@ export async function getAuditLogs(filters: AuditLogFilters = {}): Promise<Audit
   const params = new URLSearchParams()
   if (filters.action) params.set('action', filters.action)
   if (filters.entity) params.set('entity', filters.entity)
+  if (filters.email)  params.set('email',  filters.email)
   if (filters.from)   params.set('from',   filters.from)
   if (filters.to)     params.set('to',     filters.to)
   if (filters.page)   params.set('page',   String(filters.page))

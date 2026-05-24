@@ -60,6 +60,12 @@ const AUDIT_ACTIONS = Object.freeze({
   REJECT_ACTION:            'REJECT_ACTION',
   CANCEL_APPROVAL:          'CANCEL_APPROVAL',
   EXECUTE_APPROVED_ACTION:  'EXECUTE_APPROVED_ACTION',
+  UPDATE_ACCESS_MATRIX:     'UPDATE_ACCESS_MATRIX',
+  APPROVE_USER:             'APPROVE_USER',
+  REJECT_USER:              'REJECT_USER',
+  DELETE_INTERN:            'DELETE_INTERN',
+  UPDATE_INTERN:            'UPDATE_INTERN',
+  SET_AVAILABILITY_DEADLINE:'SET_AVAILABILITY_DEADLINE',
 
   // ── Phase 9: Workflow & Collaboration ─────────────────────────────────────
   ADD_TASK_NOTE:            'ADD_TASK_NOTE',

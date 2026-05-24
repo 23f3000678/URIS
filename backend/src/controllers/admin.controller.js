@@ -335,7 +335,7 @@ async function approveUser(req, res, next) {
 
     await prisma.user.update({ where: { id: userId }, data: { status: 'active' } });
 
-    void logAction(req.user?.id ?? null, 'APPROVE_USER', 'USER', userId, {
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.APPROVE_USER, AUDIT_ENTITIES.USER, userId, {
       approvedEmail: user.email,
       approvedRole:  user.role,
     });
@@ -374,7 +374,7 @@ async function setAvailabilityDeadline(req, res, next) {
   try {
     await configStore.set('availabilityDeadline', { day, hour, minute });
 
-    void logAction(req.user?.id ?? null, 'SET_AVAILABILITY_DEADLINE', 'CONFIG', null, { day, hour, minute });
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.SET_AVAILABILITY_DEADLINE, AUDIT_ENTITIES.CONFIG, null, { day, hour, minute });
 
     return ok(res, { day, hour, minute }, 'Availability deadline updated');
   } catch (err) {
@@ -403,7 +403,7 @@ async function finishInternship(req, res, next) {
       }
     });
 
-    void logAction(req.user?.id ?? null, 'FINISH_INTERNSHIP', 'INTERN', internId, {
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.FINISH_INTERNSHIP, AUDIT_ENTITIES.INTERN, internId, {
       internEmail: intern.user.email,
       internName: intern.user.name,
     });
@@ -575,7 +575,7 @@ async function changeUserRole(req, res, next) {
       }),
     ]);
 
-    void logAction(req.user?.id ?? null, 'CHANGE_USER_ROLE', 'USER', userId, {
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.CHANGE_USER_ROLE, AUDIT_ENTITIES.USER, userId, {
       userId,
       previousRole,
       newRole: normalizedRole,
@@ -604,7 +604,7 @@ async function deleteIntern(req, res, next) {
     // Delete user (cascades to intern, tasks, alerts, etc. via DB relations)
     await prisma.user.delete({ where: { id: intern.userId } });
 
-    void logAction(req.user?.id ?? null, 'DELETE_INTERN', 'USER', internId, {
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.DELETE_INTERN, AUDIT_ENTITIES.USER, internId, {
       deletedEmail: intern.user?.email,
       deletedName:  intern.user?.name,
     });
@@ -648,7 +648,7 @@ async function updateIntern(req, res, next) {
       await prisma.intern.update({ where: { id: internId }, data: internUpdate });
     }
 
-    void logAction(req.user?.id ?? null, 'UPDATE_INTERN', 'USER', internId, {
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.UPDATE_INTERN, AUDIT_ENTITIES.USER, internId, {
       internId, changes: { ...userUpdate, ...internUpdate },
     });
 
@@ -672,7 +672,7 @@ async function rejectUser(req, res, next) {
     // Hard-delete the pending user record entirely
     await prisma.user.delete({ where: { id: userId } });
 
-    void logAction(req.user?.id ?? null, 'REJECT_USER', 'USER', userId, {
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.REJECT_USER, AUDIT_ENTITIES.USER, userId, {
       rejectedEmail: user.email,
       rejectedRole:  user.role,
     });
