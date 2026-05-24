@@ -14,9 +14,15 @@ const { logAction } = require('../utils/auditLogger');
 const { AUDIT_ACTIONS, AUDIT_ENTITIES } = require('../constants/auditActions');
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+
+// On Render (and most PaaS), the app directory is read-only — only /tmp is writable.
+// Use UPLOAD_DIR env var to override, otherwise fall back to /tmp in production
+// and a local path in development.
 const UPLOAD_DIR = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
-  : path.resolve(__dirname, '../../../uploads/profile-pictures');
+  : process.env.NODE_ENV === 'production'
+    ? '/tmp/uploads/profile-pictures'
+    : path.resolve(__dirname, '../../../uploads/profile-pictures');
 
 /**
  * Inspect first 12 bytes to determine MIME type.

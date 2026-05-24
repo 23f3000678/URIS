@@ -148,7 +148,13 @@ app.use('/operational',  operationalRoutes);
 app.use('/archive',      archiveRoutes);
 app.use('/profile',      profileRoutes);
 app.use('/google',       googleRoutes);   // Google data: /google/worklog, /google/calendar
-// Serve uploaded profile pictures
+// Serve uploaded profile pictures — /tmp in production (Render), local in dev
+const uploadDir = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : process.env.NODE_ENV === 'production'
+    ? '/tmp/uploads/profile-pictures'
+    : path.join(__dirname, 'uploads', 'profile-pictures');
+app.use('/uploads/profile-pictures', express.static(uploadDir));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── TEMP: Email integration test route ───────────────────────────────────────
