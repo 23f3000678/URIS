@@ -17,6 +17,7 @@ const {
   getAllUsers,
   deleteIntern,
   updateIntern,
+  rejectUser,
 } = require('../controllers/admin.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { validate }                 = require('../middleware/validate.middleware');
@@ -38,6 +39,7 @@ router.post('/task/status',             verifyToken, requireRole(...ADMIN_ROLES)
 router.get('/overview',                 verifyToken, requireRole(...ADMIN_ROLES),                                     getAdminOverview);
 router.get('/pending-users',            verifyToken, requireRole(...ADMIN_ROLES),                                     getPendingUsers);
 router.post('/approve-user',            verifyToken, requireRole(...ADMIN_ROLES),                                     approveUser);
+router.post('/reject-user',             verifyToken, requireRole(...ADMIN_ROLES),                                     rejectUser);
 router.get('/availability-deadline',    verifyToken,                                                                   getAvailabilityDeadline);
 router.post('/availability-deadline',   verifyToken, requireRole(...ADMIN_ROLES),                                     setAvailabilityDeadline);
 router.post('/finish-internship',       verifyToken, requireRole(...ADMIN_ROLES),                                     finishInternship);

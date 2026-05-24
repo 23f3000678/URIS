@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
 import { getAllTasks, type Task } from '../services/tasks.service'
-import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, getPendingUsers, approveUser, deleteIntern, updateIntern, type AvailabilityDeadline, type PendingUser, type UpdateInternPayload } from '../services/admin.service'
+import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, getPendingUsers, approveUser, rejectUser, deleteIntern, updateIntern, type AvailabilityDeadline, type PendingUser, type UpdateInternPayload } from '../services/admin.service'
 import { updateTaskStatus } from '../services/tasks.service'
 import { extractErrorMessage } from '../services/error'
 import RoleManagementModal from '../components/RoleManagementModal'
@@ -57,6 +57,7 @@ export default function AdminOverview() {
   // Pending approvals
   const [pendingUsers, setPendingUsers]         = useState<PendingUser[]>([])
   const [approvingId, setApprovingId]           = useState<string | null>(null)
+  const [rejectingId, setRejectingId]           = useState<string | null>(null)
   const [approvalMsg, setApprovalMsg]           = useState<{ ok: boolean; text: string } | null>(null)
 
   // Role management modal
@@ -174,6 +175,21 @@ export default function AdminOverview() {
       setApprovalMsg({ ok: false, text: extractErrorMessage(err, 'Approval failed.') })
     } finally {
       setApprovingId(null)
+    }
+  }
+
+  const handleReject = async (userId: string, email: string) => {
+    if (!window.confirm(`Reject and remove ${email}? This cannot be undone.`)) return
+    setRejectingId(userId)
+    setApprovalMsg(null)
+    try {
+      await rejectUser(userId)
+      setPendingUsers(prev => prev.filter(u => u.id !== userId))
+      setApprovalMsg({ ok: true, text: `${email} rejected and removed.` })
+    } catch (err: unknown) {
+      setApprovalMsg({ ok: false, text: extractErrorMessage(err, 'Rejection failed.') })
+    } finally {
+      setRejectingId(null)
     }
   }
 
@@ -495,17 +511,30 @@ export default function AdminOverview() {
                                     </span>
                                   </div>
                                 </div>
-                                <motion.button
-                                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                                  disabled={approvingId === u.id}
-                                  onClick={() => handleApprove(u.id, u.email)}
-                                  className="ml-3 flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem] disabled:opacity-50 flex-shrink-0"
-                                  style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}>
-                                  {approvingId === u.id
-                                    ? <Loader2 size={11} className="animate-spin" />
-                                    : <Check size={11} />}
-                                  APPROVE
-                                </motion.button>
+                                <div className="ml-3 flex items-center gap-2 flex-shrink-0">
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                    disabled={approvingId === u.id || rejectingId === u.id}
+                                    onClick={() => handleApprove(u.id, u.email)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem] disabled:opacity-50"
+                                    style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}>
+                                    {approvingId === u.id
+                                      ? <Loader2 size={11} className="animate-spin" />
+                                      : <Check size={11} />}
+                                    APPROVE
+                                  </motion.button>
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                    disabled={approvingId === u.id || rejectingId === u.id}
+                                    onClick={() => handleReject(u.id, u.email)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm nav-label text-[0.55rem] disabled:opacity-50"
+                                    style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
+                                    {rejectingId === u.id
+                                      ? <Loader2 size={11} className="animate-spin" />
+                                      : <X size={11} />}
+                                    REJECT
+                                  </motion.button>
+                                </div>
                               </motion.div>
                             ))}
                           </div>

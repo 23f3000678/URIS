@@ -54,11 +54,11 @@ function LoadingSkeleton() {
 
 export default function Dashboard() {
   const user = useAuthStore(s => s.user)
-  const permissions = getPermissions(user?.role || '')
+  const isAdmin = useAuthStore(s => s.isAdmin())
 
   // Route to the correct dashboard based on role.
-  // This keeps a single /dashboard URL while serving role-appropriate content.
-  if (!permissions.modules.includes('/dashboard')) return <InternDashboard />
+  // Interns get InternDashboard; all admin/lead roles get AdminCommandDashboard.
+  if (!isAdmin) return <InternDashboard />
 
   return <AdminCommandDashboard />
 }
@@ -283,7 +283,8 @@ function AdminCommandDashboard() {
               </div>
             </motion.div>
           </div>
-          {/* Heatmap — derived from real team capacity data */}
+
+          {/* Heatmap — derived from real team capacity data */}
           {((data.teams && data.teams.length > 0) || data.interns.length > 0) && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }} className="glass-card rounded-sm mt-6 p-6">

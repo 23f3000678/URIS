@@ -657,3 +657,28 @@ async function updateIntern(req, res, next) {
     next(err);
   }
 }
+
+// ── Reject (delete) a pending user ───────────────────────────────────────────
+
+async function rejectUser(req, res, next) {
+  try {
+    const { userId } = req.body;
+    if (!userId) return validationError(res, 'userId is required');
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return notFound(res, 'User not found');
+    if (user.status !== 'pending') return validationError(res, 'User is not pending approval');
+
+    // Hard-delete the pending user record entirely
+    await prisma.user.delete({ where: { id: userId } });
+
+    void logAction(req.user?.id ?? null, 'REJECT_USER', 'USER', userId, {
+      rejectedEmail: user.email,
+      rejectedRole:  user.role,
+    });
+
+    return ok(res, null, `User ${user.email} rejected and removed.`);
+  } catch (err) {
+    next(err);
+  }
+}
