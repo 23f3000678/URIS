@@ -90,3 +90,20 @@ export async function getIntegrationStatus(): Promise<IntegrationAudit> {
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
   return res.json()
 }
+
+// ── Intern Management ─────────────────────────────────────────────────────────
+
+export interface UpdateInternPayload {
+  name?: string
+  gdocUrl?: string
+  joiningDate?: string
+  dateOfBirth?: string
+}
+
+export async function deleteIntern(internId: string): Promise<void> {
+  await api.delete(`/admin/interns/${internId}`)
+}
+
+export async function updateIntern(internId: string, payload: UpdateInternPayload): Promise<void> {
+  await api.patch(`/admin/interns/${internId}`, payload)
+}

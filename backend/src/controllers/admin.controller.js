@@ -414,7 +414,7 @@ async function finishInternship(req, res, next) {
   }
 }
 
-module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers };
+module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers, deleteIntern, updateIntern };
 
 // ── Get all users (for role management UI) ────────────────────────────────────
 
@@ -583,6 +583,76 @@ async function changeUserRole(req, res, next) {
     });
 
     return ok(res, { userId, previousRole, newRole: normalizedRole }, `Role updated to ${normalizedRole}`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Delete Intern ─────────────────────────────────────────────────────────────
+
+async function deleteIntern(req, res, next) {
+  try {
+    const { internId } = req.params;
+    if (!internId) return validationError(res, 'internId is required');
+
+    const intern = await prisma.intern.findUnique({
+      where: { id: internId },
+      include: { user: { select: { id: true, email: true, name: true } } },
+    });
+    if (!intern) return notFound(res, 'Intern not found');
+
+    // Delete user (cascades to intern, tasks, alerts, etc. via DB relations)
+    await prisma.user.delete({ where: { id: intern.userId } });
+
+    void logAction(req.user?.id ?? null, 'DELETE_INTERN', 'USER', internId, {
+      deletedEmail: intern.user?.email,
+      deletedName:  intern.user?.name,
+    });
+
+    return ok(res, null, `Intern ${intern.user?.name || intern.user?.email} deleted successfully`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Update Intern (name, gdocUrl, joiningDate) ────────────────────────────────
+
+async function updateIntern(req, res, next) {
+  try {
+    const { internId } = req.params;
+    if (!internId) return validationError(res, 'internId is required');
+
+    const intern = await prisma.intern.findUnique({
+      where: { id: internId },
+      include: { user: true },
+    });
+    if (!intern) return notFound(res, 'Intern not found');
+
+    const { name, gdocUrl, joiningDate, dateOfBirth } = req.body;
+
+    // Update User fields
+    const userUpdate = {};
+    if (typeof name === 'string' && name.trim()) userUpdate.name = name.trim();
+    if (joiningDate) userUpdate.joiningDate = new Date(joiningDate);
+    if (dateOfBirth)  userUpdate.dateOfBirth  = new Date(dateOfBirth);
+
+    if (Object.keys(userUpdate).length > 0) {
+      await prisma.user.update({ where: { id: intern.userId }, data: userUpdate });
+    }
+
+    // Update Intern fields
+    const internUpdate = {};
+    if (gdocUrl !== undefined) internUpdate.gdocUrl = gdocUrl || null;
+
+    if (Object.keys(internUpdate).length > 0) {
+      await prisma.intern.update({ where: { id: internId }, data: internUpdate });
+    }
+
+    void logAction(req.user?.id ?? null, 'UPDATE_INTERN', 'USER', internId, {
+      internId, changes: { ...userUpdate, ...internUpdate },
+    });
+
+    return ok(res, null, 'Intern updated successfully');
   } catch (err) {
     next(err);
   }

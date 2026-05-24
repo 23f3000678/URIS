@@ -16,19 +16,28 @@ if (!process.env.JWT_SECRET) {
 // ── Register ──────────────────────────────────────────────────────────────────
 
 async function register({ name, email, password, role, dateOfBirth, joiningDate, gdocUrl, profilePictureUrl }) {
-  const prismaRole = normalizeRole(role ?? 'intern');
-  if (!prismaRole) {
-    const err = new Error(`Invalid role "${role}". Accepted values: intern, admin.`);
-    err.status = 400;
-    throw err;
-  }
+  // @stemonef.org emails are always CORE_ADMIN, active immediately — no approval needed
+  const ADMIN_DOMAIN = '@stemonef.org';
+  const isAdminDomain = email.toLowerCase().endsWith(ADMIN_DOMAIN);
 
-  // Restrict public registration to TECHNICAL_INTERN and RESEARCH_INTERN only
-  const PUBLIC_ROLES = new Set(['TECHNICAL_INTERN', 'RESEARCH_INTERN']);
-  if (!PUBLIC_ROLES.has(prismaRole)) {
-    const err = new Error('Role not permitted for public registration.');
-    err.status = 400;
-    throw err;
+  let prismaRole;
+  if (isAdminDomain) {
+    prismaRole = 'CORE_ADMIN';
+  } else {
+    prismaRole = normalizeRole(role ?? 'intern');
+    if (!prismaRole) {
+      const err = new Error(`Invalid role "${role}". Accepted values: intern, admin.`);
+      err.status = 400;
+      throw err;
+    }
+
+    // Restrict public registration to TECHNICAL_INTERN and RESEARCH_INTERN only
+    const PUBLIC_ROLES = new Set(['TECHNICAL_INTERN', 'RESEARCH_INTERN']);
+    if (!PUBLIC_ROLES.has(prismaRole)) {
+      const err = new Error('Role not permitted for public registration.');
+      err.status = 400;
+      throw err;
+    }
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -40,7 +49,8 @@ async function register({ name, email, password, role, dateOfBirth, joiningDate,
 
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-  const status = 'pending';
+  // @stemonef.org admins are active immediately; all others start as pending
+  const status = isAdminDomain ? 'active' : 'pending';
 
   const displayName = (typeof name === 'string' && name.trim())
     ? name.trim()
@@ -94,7 +104,17 @@ async function register({ name, email, password, role, dateOfBirth, joiningDate,
     });
   }
 
-  // All registrations are pending — return no token
+  // @stemonef.org admins get a token immediately and are redirected to dashboard.
+  // All other registrations are pending approval — no token issued.
+  if (isAdminDomain) {
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+    );
+    return { token, user: { id: user.id, email: user.email, role: user.role.toLowerCase(), name: user.name } };
+  }
+
   return { pending: true, user: { email: user.email, role: user.role.toLowerCase(), name: user.name } };
 }
 

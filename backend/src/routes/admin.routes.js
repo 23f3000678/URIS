@@ -15,6 +15,8 @@ const {
   getLoginLogs,
   changeUserRole,
   getAllUsers,
+  deleteIntern,
+  updateIntern,
 } = require('../controllers/admin.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
 const { validate }                 = require('../middleware/validate.middleware');
@@ -39,6 +41,8 @@ router.post('/approve-user',            verifyToken, requireRole(...ADMIN_ROLES)
 router.get('/availability-deadline',    verifyToken,                                                                   getAvailabilityDeadline);
 router.post('/availability-deadline',   verifyToken, requireRole(...ADMIN_ROLES),                                     setAvailabilityDeadline);
 router.post('/finish-internship',       verifyToken, requireRole(...ADMIN_ROLES),                                     finishInternship);
+router.delete('/interns/:internId',     verifyToken, requireRole(ROLES.CORE_ADMIN),                                   deleteIntern);
+router.patch('/interns/:internId',      verifyToken, requireRole(...ADMIN_ROLES),                                     updateIntern);
 
 // ── Phase 2: Security & Governance (also exposed via /operational) ────────────
 router.post('/block-ip',                verifyToken, requireRole(ROLES.CORE_ADMIN),                                   blockIP);

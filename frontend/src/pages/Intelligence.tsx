@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   Activity, AlertTriangle, CheckCircle, Clock, Loader2,
-  TrendingUp, Users, Zap, Shield, BarChart2, Target, Bell, TrendingDown, Globe,
+  TrendingUp, Users, Zap, BarChart2, Target, Bell, TrendingDown, Globe,
 } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
@@ -111,7 +111,7 @@ function ChartTooltip({ active, payload, label }: any) {
   )
 }
 
-type Tab = 'overview' | 'risks' | 'assignment' | 'workload' | 'trends' | 'alerts' | 'sla' | 'teams' | 'digest' | 'google'
+type Tab = 'overview' | 'risks' | 'assignment' | 'workload' | 'trends' | 'alerts' | 'teams' | 'digest' | 'google'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'overview',   label: 'OVERVIEW',   icon: BarChart2 },
@@ -120,7 +120,6 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'workload',   label: 'WORKLOAD',   icon: Activity },
   { key: 'trends',     label: 'TRENDS',     icon: TrendingUp },
   { key: 'alerts',     label: 'ALERTS',     icon: Bell },
-  { key: 'sla',        label: 'SLA',        icon: Shield },
   { key: 'teams',      label: 'TEAMS',      icon: Users },
   { key: 'digest',     label: 'DIGEST',     icon: Zap },
   { key: 'google',     label: 'GOOGLE',     icon: Globe },
@@ -921,7 +920,6 @@ export default function Intelligence() {
                 {tab === 'workload'   && <WorkloadTab   data={data} />}
                 {tab === 'trends'     && <TrendsTab     data={data} />}
                 {tab === 'alerts'     && <AlertsTab     data={data} />}
-                {tab === 'sla'        && <SLATab        data={data} />}
                 {tab === 'teams'      && <TeamsTab      data={data} />}
                 {tab === 'digest'     && <DigestTab     data={data} />}
                 {tab === 'google'     && (

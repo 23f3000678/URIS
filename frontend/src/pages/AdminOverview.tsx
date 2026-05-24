@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, TrendingUp, X, Check, UserCheck, AlertTriangle, Loader2, Clock, ShieldCheck } from 'lucide-react'
+import { Shield, TrendingUp, X, Check, UserCheck, AlertTriangle, Loader2, Clock, ShieldCheck, Trash2, Edit2, Users } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import { getAdminOverview, type InternRow } from '../services/dashboard.service'
 import { getAllTasks, type Task } from '../services/tasks.service'
-import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, getPendingUsers, approveUser, type AvailabilityDeadline, type PendingUser } from '../services/admin.service'
+import { overrideScore, assignTask, getAvailabilityDeadline, setAvailabilityDeadline, getPendingUsers, approveUser, deleteIntern, updateIntern, type AvailabilityDeadline, type PendingUser, type UpdateInternPayload } from '../services/admin.service'
 import { updateTaskStatus } from '../services/tasks.service'
 import { extractErrorMessage } from '../services/error'
 import RoleManagementModal from '../components/RoleManagementModal'
@@ -25,7 +25,7 @@ export default function AdminOverview() {
   const [tasks, setTasks]         = useState<Task[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
-  const [activeTab, setActiveTab] = useState<'override' | 'assign' | 'status' | 'deadline' | 'approvals' | 'roles'>('assign')
+  const [activeTab, setActiveTab] = useState<'override' | 'assign' | 'status' | 'deadline' | 'approvals' | 'roles' | 'interns'>('assign')
 
   // Override score form
   const [overrideInternId, setOverrideInternId] = useState('')
@@ -61,6 +61,13 @@ export default function AdminOverview() {
 
   // Role management modal
   const [showRoleModal, setShowRoleModal] = useState(false)
+
+  // Intern management
+  const [internMgmtMsg, setInternMgmtMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+  const [deletingId, setDeletingId]           = useState<string | null>(null)
+  const [editingIntern, setEditingIntern]     = useState<InternRow | null>(null)
+  const [editForm, setEditForm]               = useState<UpdateInternPayload>({})
+  const [editLoading, setEditLoading]         = useState(false)
 
   useEffect(() => {
     async function load(): Promise<void> {
@@ -177,6 +184,7 @@ export default function AdminOverview() {
     { key: 'deadline',  label: 'DEADLINE',        icon: Clock },
     { key: 'approvals', label: 'APPROVALS',       icon: UserCheck, badge: pendingUsers.length },
     { key: 'roles',     label: 'ROLES',           icon: ShieldCheck },
+    { key: 'interns',   label: 'INTERNS',         icon: Users },
   ] as const
 
   return (
@@ -594,6 +602,135 @@ export default function AdminOverview() {
                           <ShieldCheck size={14} />
                           OPEN ROLE MANAGER
                         </motion.button>
+                      </motion.div>
+                    )}
+
+                    {/* INTERNS */}
+                    {activeTab === 'interns' && (
+                      <motion.div key="interns" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }} className="space-y-4">
+                        <p className="nav-label text-[0.55rem] text-gold/40 mb-3">INTERN MANAGEMENT</p>
+
+                        {internMgmtMsg && <FeedbackBanner ok={internMgmtMsg.ok} text={internMgmtMsg.text} />}
+
+                        {/* Edit form */}
+                        {editingIntern && (
+                          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                            className="p-4 rounded-sm space-y-3"
+                            style={{ background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)' }}>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="nav-label text-[0.55rem] text-gold/60">EDITING: {editingIntern.name}</p>
+                              <button onClick={() => { setEditingIntern(null); setEditForm({}) }}
+                                className="text-ice/30 hover:text-frost transition-colors">
+                                <X size={13} />
+                              </button>
+                            </div>
+                            <div>
+                              <label className="nav-label text-[0.55rem] text-gold/50 block mb-1">FULL NAME</label>
+                              <input type="text" className="uris-input" placeholder={editingIntern.name}
+                                value={editForm.name ?? ''}
+                                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="nav-label text-[0.55rem] text-gold/50 block mb-1">GDOC URL</label>
+                              <input type="url" className="uris-input" placeholder="https://docs.google.com/document/d/..."
+                                value={editForm.gdocUrl ?? ''}
+                                onChange={e => setEditForm(f => ({ ...f, gdocUrl: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="nav-label text-[0.55rem] text-gold/50 block mb-1">JOINING DATE</label>
+                              <input type="date" className="uris-input"
+                                value={editForm.joiningDate ?? ''}
+                                onChange={e => setEditForm(f => ({ ...f, joiningDate: e.target.value }))} />
+                            </div>
+                            <motion.button
+                              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                              disabled={editLoading}
+                              onClick={async () => {
+                                setEditLoading(true)
+                                setInternMgmtMsg(null)
+                                try {
+                                  await updateIntern(editingIntern.id, editForm)
+                                  setInternMgmtMsg({ ok: true, text: `${editingIntern.name} updated successfully.` })
+                                  setInterns(prev => prev.map(i => i.id === editingIntern.id
+                                    ? { ...i, name: editForm.name || i.name }
+                                    : i))
+                                  setEditingIntern(null)
+                                  setEditForm({})
+                                } catch (err: unknown) {
+                                  setInternMgmtMsg({ ok: false, text: extractErrorMessage(err, 'Update failed.') })
+                                } finally {
+                                  setEditLoading(false)
+                                }
+                              }}
+                              className="btn-gold w-full py-2 rounded-sm flex items-center justify-center gap-2 text-xs disabled:opacity-50">
+                              {editLoading ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                              SAVE CHANGES
+                            </motion.button>
+                          </motion.div>
+                        )}
+
+                        {/* Intern list */}
+                        {interns.length === 0 ? (
+                          <div className="py-8 text-center">
+                            <p className="font-body text-sm text-ice/30">No interns found.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {interns.map(intern => (
+                              <motion.div key={intern.id}
+                                initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                                className="flex items-center justify-between p-3 rounded-sm"
+                                style={{ background: 'rgba(13,15,28,0.6)', border: '1px solid rgba(201,168,76,0.1)' }}>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-body text-sm text-frost/90 truncate">{intern.name}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="nav-label text-[0.45rem]"
+                                      style={{ color: intern.capacityScore > 60 ? '#4ade80' : intern.capacityScore > 30 ? '#f59e0b' : '#f87171' }}>
+                                      CAP {intern.capacityScore}
+                                    </span>
+                                    <span className="nav-label text-[0.45rem] text-ice/25">·</span>
+                                    <span className="nav-label text-[0.45rem] text-ice/30">{intern.activeTasks ?? 0} ACTIVE</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                    onClick={() => { setEditingIntern(intern); setEditForm({ name: intern.name }); setInternMgmtMsg(null) }}
+                                    className="p-1.5 rounded-sm transition-colors"
+                                    style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.2)' }}
+                                    title="Edit intern">
+                                    <Edit2 size={11} className="text-gold" />
+                                  </motion.button>
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                    disabled={deletingId === intern.id}
+                                    onClick={async () => {
+                                      if (!window.confirm(`Delete ${intern.name}? This cannot be undone.`)) return
+                                      setDeletingId(intern.id)
+                                      setInternMgmtMsg(null)
+                                      try {
+                                        await deleteIntern(intern.id)
+                                        setInterns(prev => prev.filter(i => i.id !== intern.id))
+                                        setInternMgmtMsg({ ok: true, text: `${intern.name} deleted.` })
+                                      } catch (err: unknown) {
+                                        setInternMgmtMsg({ ok: false, text: extractErrorMessage(err, 'Delete failed.') })
+                                      } finally {
+                                        setDeletingId(null)
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-sm transition-colors disabled:opacity-40"
+                                    style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}
+                                    title="Delete intern">
+                                    {deletingId === intern.id
+                                      ? <Loader2 size={11} className="text-red-400 animate-spin" />
+                                      : <Trash2 size={11} className="text-red-400" />}
+                                  </motion.button>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
                       </motion.div>
                     )}
 
