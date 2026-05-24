@@ -414,7 +414,7 @@ async function finishInternship(req, res, next) {
   }
 }
 
-module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers, deleteIntern, updateIntern };
+module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers, deleteIntern, updateIntern, rejectUser };
 
 // ── Get all users (for role management UI) ────────────────────────────────────
 
