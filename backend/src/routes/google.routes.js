@@ -22,8 +22,8 @@ const {
 const { verifyToken } = require('../middleware/auth.middleware');
 
 // ── OAuth flow (mounted under /auth) ──────────────────────────────────────────
-router.get('/google',           verifyToken, initiateGoogleAuth);
-router.get('/google/callback',               handleGoogleCallback);  // no JWT — Google redirects here
+router.get('/google',           initiateGoogleAuth);          // token passed as ?token= query param
+router.get('/google/callback',  handleGoogleCallback);        // no JWT — Google redirects here
 router.delete('/google',        verifyToken, disconnectGoogle);
 
 // ── Status + data (mounted under /google AND /auth) ───────────────────────────

@@ -92,13 +92,9 @@ async function register({ name, email, password, role, dateOfBirth, joiningDate,
 
   // Auto-create Intern record for intern roles
   if (isInternRole) {
-    const baseSlug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
-
     await prisma.intern.create({
       data: {
         userId:  user.id,
-        slug:    slug,
         gdocUrl: gdocUrl || null,
       },
     });

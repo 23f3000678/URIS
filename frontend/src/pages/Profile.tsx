@@ -168,10 +168,10 @@ export default function Profile() {
                           src={profile.profilePictureUrl}
                           alt={profile.name}
                           className="w-full h-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style') }}
                         />
-                      ) : (
-                        <User size={32} className="text-gold/40" />
-                      )}
+                      ) : null}
+                      <User size={32} className="text-gold/40" style={profile.profilePictureUrl ? { display: 'none' } : {}} />
                     </div>
                     {uploading && (
                       <div className="absolute inset-0 rounded-full flex items-center justify-center"

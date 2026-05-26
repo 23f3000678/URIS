@@ -218,6 +218,42 @@ export default function InternDashboard() {
           {/* Content */}
           {!loading && !error && data && (
             <>
+              {/* ── New user onboarding state ── */}
+              {data.isNewUser && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                  className="glass-card rounded-sm p-10 text-center mb-6"
+                  style={{ border: '1px solid rgba(201,168,76,0.15)' }}>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
+                    style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
+                    <ClipboardList size={24} className="text-gold/60" />
+                  </div>
+                  <h2 className="font-display font-black text-2xl text-ice-gradient mb-2">Welcome aboard</h2>
+                  <div className="gold-rule w-12 mx-auto mb-4" />
+                  <p className="font-body text-sm text-ice/50 mb-2">
+                    Your account is set up and ready. Your tasks haven't started yet.
+                  </p>
+                  <p className="font-body text-sm text-ice/35 mb-6">
+                    Once an admin assigns tasks to you, they'll appear here along with your performance scores.
+                  </p>
+                  <div className="grid grid-cols-3 gap-4 max-w-xs mx-auto">
+                    {[
+                      { label: 'CAPACITY', val: '0' },
+                      { label: 'PERFORMANCE', val: '0.00' },
+                      { label: 'CREDIBILITY', val: '0' },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="rounded-sm p-3"
+                        style={{ background: 'rgba(184,212,240,0.04)', border: '1px solid rgba(184,212,240,0.08)' }}>
+                        <p className="font-display font-black text-xl text-ice/30">{val}</p>
+                        <p className="nav-label text-[0.44rem] text-ice/20 mt-0.5">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── Normal dashboard (only when not new user) ── */}
+              {!data.isNewUser && (
+                <>
               {/* Score rings */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
@@ -406,6 +442,9 @@ export default function InternDashboard() {
               </div>
             </>
           )}
+            </>
+          )}
+
         </div>
       </main>
     </div>

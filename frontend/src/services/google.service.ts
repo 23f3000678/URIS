@@ -41,8 +41,16 @@ export async function getGoogleStatus(): Promise<GoogleStatus> {
 }
 
 export async function connectGoogle(): Promise<void> {
-  // Redirect to backend OAuth initiation — backend will redirect to Google
-  window.location.href = `${import.meta.env.VITE_API_URL ?? 'http://localhost:5000'}/auth/google`
+  // Redirect to backend OAuth initiation — pass JWT as query param since
+  // browser redirects cannot send Authorization headers
+  const token = localStorage.getItem('uris_auth')
+  let jwt = ''
+  try {
+    const parsed = JSON.parse(token ?? '{}')
+    jwt = parsed?.state?.token ?? ''
+  } catch { /* ignore */ }
+  const base = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
+  window.location.href = `${base}/auth/google${jwt ? `?token=${encodeURIComponent(jwt)}` : ''}`
 }
 
 export async function disconnectGoogle(): Promise<void> {

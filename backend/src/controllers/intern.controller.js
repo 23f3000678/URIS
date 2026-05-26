@@ -20,7 +20,17 @@ async function getInternDashboard(req, res, next) {
     });
 
     if (!intern) {
-      return notFound(res, 'Intern not found');
+      // New user whose intern record hasn't been created yet (e.g. pending approval).
+      // Return a zero-state dashboard so the UI shows a friendly empty state.
+      return ok(res, {
+        capacityScore:   0,
+        performanceIndex: 0,
+        credibility:     0,
+        assignedTasks:   [],
+        unreadAlerts:    [],
+        unreadCount:     0,
+        isNewUser:       true,
+      });
     }
 
     const internId = intern.id;

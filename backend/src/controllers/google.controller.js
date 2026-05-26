@@ -5,13 +5,31 @@ const { ok, notFound } = require('../utils/respond');
 const logger = require('../utils/logger');
 
 /**
- * GET /auth/google
+ * GET /auth/google?token=<jwt>
  * Redirect the authenticated user to Google's OAuth consent screen.
+ * Accepts the JWT as a query parameter because this is a browser redirect
+ * (window.location.href) — Authorization headers cannot be sent in browser redirects.
  */
 async function initiateGoogleAuth(req, res) {
-  const userId = req.user.id;
-  const url = googleService.getAuthUrl(userId);
-  return res.redirect(url);
+  const jwt    = require('jsonwebtoken');
+  const prisma = require('../utils/prisma');
+  const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
+
+  const token = req.query.token;
+  if (!token) {
+    return res.redirect(`${frontendBase}/profile?google=error&reason=no_token`);
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true } });
+    if (!user) return res.redirect(`${frontendBase}/profile?google=error&reason=user_not_found`);
+
+    const url = googleService.getAuthUrl(user.id);
+    return res.redirect(url);
+  } catch {
+    return res.redirect(`${frontendBase}/profile?google=error&reason=invalid_token`);
+  }
 }
 
 /**

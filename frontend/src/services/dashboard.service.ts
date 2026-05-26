@@ -61,6 +61,7 @@ export interface InternDashboard {
   credibility: number
   unreadCount: number
   unreadAlerts: InternAlert[]
+  isNewUser?: boolean
   assignedTasks: Array<{
     id: string
     title: string
