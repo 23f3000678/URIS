@@ -202,16 +202,27 @@ app.use(errorHandler);
 
 const prisma          = require('./src/utils/prisma');
 const scheduler       = require('./src/services/scheduler');
-const realtimeEngine  = require('./src/services/realtimeEngine');
+
+// Load realtimeEngine lazily — if socket.io fails to load, server still starts
+let realtimeEngine = null;
+try {
+  realtimeEngine = require('./src/services/realtimeEngine');
+} catch (err) {
+  logger.warn({ err: err.message }, 'realtimeEngine failed to load — realtime features disabled');
+}
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Server running');
 
-  // Initialise Socket.IO realtime engine on the same http.Server.
-  // Skipped in test environments to avoid background jobs interfering with tests.
   if (process.env.NODE_ENV !== 'test') {
-    realtimeEngine.init(server, ALLOWED_ORIGINS);
+    if (realtimeEngine) {
+      try {
+        realtimeEngine.init(server, ALLOWED_ORIGINS);
+      } catch (err) {
+        logger.warn({ err: err.message }, 'Socket.IO init failed — realtime features disabled');
+      }
+    }
     scheduler.start();
   }
 });

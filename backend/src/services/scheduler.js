@@ -23,8 +23,25 @@ const logger = require('../utils/logger');
 const { syncTasksFromPlane, detectAndMarkStaleTasks, generateDeadlineAlerts, generateAvailabilityReminders, generateTaskReminders, generateFormReminders } = require('./taskService');
 const { generateBlockerAlerts, generateReassignmentAlerts } = require('./alertService');
 const realtimeEngine = require('./realtimeEngine');
-const { syncAllTasksToOP }         = require('./openproject.service');
-const { runOPIntelligenceRefresh } = require('./openproject.intelligence');
+
+// OpenProject modules loaded lazily inside job functions to prevent startup crashes
+// if those modules have load-time errors
+let _opService = null;
+let _opIntelligence = null;
+
+function getOPService() {
+  if (!_opService) {
+    try { _opService = require('./openproject.service'); } catch { _opService = { syncAllTasksToOP: async () => ({ pushed: 0, errors: 0 }) }; }
+  }
+  return _opService;
+}
+
+function getOPIntelligence() {
+  if (!_opIntelligence) {
+    try { _opIntelligence = require('./openproject.intelligence'); } catch { _opIntelligence = { runOPIntelligenceRefresh: async () => ({ signals: {}, alertsCreated: 0 }) }; }
+  }
+  return _opIntelligence;
+}
 
 const { generateWeeklyDigest } = require('./digestService');
 const { recomputeInternTLI } = require('./recomputeInternTLI');
@@ -467,7 +484,6 @@ function _startGdocMetaRefreshJob() {
 // ── OpenProject outbound sync job ─────────────────────────────────────────────
 
 function _startOPSyncJob() {
-  // Default: every 30 minutes — push new URIS tasks to OpenProject
   const expression = process.env.OP_SYNC_CRON || '*/30 * * * *';
   if (!cron.validate(expression)) {
     logger.error({ expression }, 'OP_SYNC_CRON is not valid — OpenProject sync job not started');
@@ -479,6 +495,7 @@ function _startOPSyncJob() {
     const runId = Date.now();
     logger.info({ runId }, 'OpenProject sync job started');
     try {
+      const { syncAllTasksToOP } = getOPService();
       const { pushed, errors } = await syncAllTasksToOP();
       logger.info({ runId, pushed, errors }, 'OpenProject sync job completed');
     } catch (err) {
@@ -490,7 +507,6 @@ function _startOPSyncJob() {
 // ── OpenProject intelligence job ──────────────────────────────────────────────
 
 function _startOPIntelligenceJob() {
-  // Default: every 6 hours — extract OP signals and generate alerts
   const expression = process.env.OP_INTELLIGENCE_CRON || '0 */6 * * *';
   if (!cron.validate(expression)) {
     logger.error({ expression }, 'OP_INTELLIGENCE_CRON is not valid — OpenProject intelligence job not started');
@@ -502,10 +518,10 @@ function _startOPIntelligenceJob() {
     const runId = Date.now();
     logger.info({ runId }, 'OpenProject intelligence job started');
     try {
+      const { runOPIntelligenceRefresh } = getOPIntelligence();
       const { signals, alertsCreated } = await runOPIntelligenceRefresh();
       logger.info({ runId, alertsCreated, opHealthScore: signals?.opHealthScore }, 'OpenProject intelligence job completed');
 
-      // Emit realtime event if OP health is degraded
       if (signals?.available && signals?.opHealthScore < 60) {
         realtimeEngine.emitIntegrationChange({
           createdAlertsCount: alertsCreated,

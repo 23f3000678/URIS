@@ -18,9 +18,17 @@
  */
 
 const axios      = require('axios');
-const axiosRetry = require('axios-retry').default;
 const prisma     = require('../utils/prisma');
 const logger     = require('../utils/logger');
+
+// axios-retry: handle both CJS and ESM module shapes
+let axiosRetry;
+try {
+  const ar = require('axios-retry');
+  axiosRetry = ar.default ?? ar;
+} catch {
+  axiosRetry = null;
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -38,15 +46,17 @@ const axiosOP = axios.create({
   timeout: parseInt(process.env.OPENPROJECT_REQUEST_TIMEOUT_MS) || 12_000,
 });
 
-axiosRetry(axiosOP, {
-  retries:        3,
-  retryDelay:     axiosRetry.exponentialDelay,
-  retryCondition: (err) =>
-    axiosRetry.isNetworkError(err) || axiosRetry.isRetryableError(err),
-  onRetry: (retryCount, err) => {
-    logger.warn({ retryCount, status: err.response?.status, msg: err.message }, 'OpenProject API retry');
-  },
-});
+if (axiosRetry) {
+  axiosRetry(axiosOP, {
+    retries:        3,
+    retryDelay:     axiosRetry.exponentialDelay,
+    retryCondition: (err) =>
+      axiosRetry.isNetworkError(err) || axiosRetry.isRetryableError(err),
+    onRetry: (retryCount, err) => {
+      logger.warn({ retryCount, status: err.response?.status, msg: err.message }, 'OpenProject API retry');
+    },
+  });
+}
 
 function opHeaders() {
   return {
@@ -56,6 +66,7 @@ function opHeaders() {
 }
 
 function opUrl(path) {
+  if (!OP_BASE_URL) return `/api/v3${path}`; // fallback — only called when isConfigured() is true
   const base = OP_BASE_URL.replace(/\/$/, '');
   return `${base}/api/v3${path}`;
 }
