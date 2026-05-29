@@ -26,6 +26,9 @@ import Settings           from './pages/Settings'
 import ForgotPassword     from './pages/ForgotPassword'
 import ResetPassword      from './pages/ResetPassword'
 import Integrations       from './pages/Integrations'
+import ChatPage           from './routes/chat'
+import ChatFindPage       from './routes/chat-find'
+import ChatRequestsPage   from './routes/chat-requests'
 import { useAuthStore, selectIsAuthenticated, selectIsAdmin } from './store/authStore'
 import { useAlertStore } from './store/alertStore'
 import { ROLES } from './constants/roles'
@@ -98,6 +101,14 @@ export default function App() {
             element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/settings"
             element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+          {/* Protected — chat routes (any authenticated user) */}
+          <Route path="/chat"
+            element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+          <Route path="/chat/find"
+            element={<ProtectedRoute><ChatFindPage /></ProtectedRoute>} />
+          <Route path="/chat/requests"
+            element={<ProtectedRoute><ChatRequestsPage /></ProtectedRoute>} />
 
           {/* Protected — leads + CORE_ADMIN (operational pages) */}
           <Route path="/review"

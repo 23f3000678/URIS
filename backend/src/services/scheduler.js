@@ -52,7 +52,7 @@ const DEFAULT_DIGEST_CRON       = '0 8 * * 1';   // Monday 08:00 UTC
 const DEFAULT_DEADLINE_CRON     = '0 * * * *';   // Every hour
 const DEFAULT_AVAILABILITY_CRON = '0 9 * * 1';   // Monday 09:00 UTC
 const DEFAULT_TASK_REMINDER_CRON = '0 9 * * 0,4'; // Thursday and Sunday 09:00 UTC
-const DEFAULT_FORM_REMINDER_CRON = '0 9 */3 * *'; // Every 3 days at 09:00 UTC
+const DEFAULT_FORM_REMINDER_CRON = '0 9 * * 1,4'; // Monday & Thursday at 09:00 UTC
 const DEFAULT_GDOC_REMINDER_CRON = '0 9 */3 * *'; // Every 3 days at 09:00 UTC
 const DEFAULT_GDOC_META_CRON     = '0 */6 * * *'; // Every 6 hours
 
