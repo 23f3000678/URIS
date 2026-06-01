@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { File, Download, AlertTriangle, FileText } from 'lucide-react'
+import { Download, AlertTriangle, FileText } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import api from '../services/api'

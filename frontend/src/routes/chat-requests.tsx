@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore, selectToken, selectUser } from '../store/authStore'
+import { useAuthStore, selectToken } from '../store/authStore'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import api from '../services/api'
@@ -25,7 +25,6 @@ type FilterType = 'all' | 'pending' | 'accepted' | 'rejected'
 
 export default function ChatRequestsPage() {
   const token = useAuthStore(selectToken)
-  const user = useAuthStore(selectUser)
   const nav = useNavigate()
 
   const [requests, setRequests] = useState<FriendRequest[]>([])

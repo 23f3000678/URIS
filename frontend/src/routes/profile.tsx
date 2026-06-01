@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import GoogleConnectButton from '../components/GoogleConnectButton'
 import api from '../services/api'
-import { useAuthStore, selectToken, selectUser } from '../store/authStore'
+import { useAuthStore, selectToken } from '../store/authStore'
 import { extractErrorMessage } from '../services/error'
 
 interface UserProfile {
@@ -19,7 +19,6 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const token = useAuthStore(selectToken)
-  const user = useAuthStore(selectUser)
   const nav = useNavigate()
   const logout = useAuthStore(s => s.logout)
 

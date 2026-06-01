@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore, selectToken, selectUser } from '../store/authStore'
+import { useAuthStore, selectToken } from '../store/authStore'
 import Sidebar from '../components/Sidebar'
 import Starfield from '../components/Starfield'
 import api from '../services/api'
@@ -28,7 +28,6 @@ interface Friend {
 
 export default function ChatPage() {
   const token = useAuthStore(selectToken)
-  const user = useAuthStore(selectUser)
   const nav = useNavigate()
 
   const [chats, setChats] = useState<Chat[]>([])
