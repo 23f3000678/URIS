@@ -54,7 +54,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit', '/profile', '/settings']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/chat', '/portfolio-edit', '/profile', '/settings']
   },
   'operations_intern': {
     canSeeAllTasks: 'NO',
@@ -62,7 +62,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit', '/profile', '/settings']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/chat', '/portfolio-edit', '/profile', '/settings']
   },
   'research_intern': {
     canSeeAllTasks: 'NO',
@@ -70,7 +70,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit', '/profile', '/settings']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/chat', '/portfolio-edit', '/profile', '/settings']
   },
   'orenda_member': {
     canSeeAllTasks: 'NO',
@@ -78,7 +78,7 @@ export const ROLE_PERMISSIONS: Record<string, Permissions> = {
     canSeeNotes: false,
     canAssign: 'NO',
     canReview: 'NO',
-    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/portfolio-edit', '/profile', '/settings']
+    modules: ['/dashboard', '/availability', '/tasks', '/notifications', '/chat', '/portfolio-edit', '/profile', '/settings']
   },
   'observer_team_lead': {
     canSeeAllTasks: 'OBSERVED',
