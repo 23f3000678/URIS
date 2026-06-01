@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, CalendarDays, ClipboardList, Star, Users, Bell, LogOut, ChevronRight, ShieldCheck, ScrollText, TrendingUp, Shield, Menu, X, UserCircle, Settings, Wifi } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, ClipboardList, Star, Users, Bell, LogOut, ChevronRight, ShieldCheck, ScrollText, TrendingUp, Shield, Menu, X, UserCircle, Settings, Wifi, MessageSquare } from 'lucide-react'
 import { useAuthStore, selectUser, selectIsAdmin } from '../store/authStore'
 import { useAlertStore } from '../store/alertStore'
 import { useRealtimeStore } from '../store/realtimeStore'
@@ -14,6 +14,7 @@ const allItems = [
   { icon: CalendarDays,    label: 'Availability',  to: '/availability' },
   { icon: ClipboardList,   label: 'Tasks',         to: '/tasks' },
   { icon: Bell,            label: 'Notifications', to: '/notifications' },
+  { icon: MessageSquare,   label: 'Chat',          to: '/chat' },
   { icon: Star,            label: 'Reviews',       to: '/review' },
   { icon: Users,           label: 'Team',          to: '/team' },
   { icon: Bell,            label: 'Alerts',        to: '/alerts' },
@@ -33,7 +34,8 @@ export default function Sidebar() {
   const isAdmin = useAuthStore(selectIsAdmin)
   const logout  = useAuthStore(s => s.logout)
   const nav     = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [mobileOpen, setMobileOpen]   = useState(false)
+  const [desktopOpen, setDesktopOpen] = useState(true)
 
   // Read unread count from shared store — no local fetch
   const unread = useAlertStore(s => s.unread)
@@ -154,17 +156,42 @@ export default function Sidebar() {
         initial={{ x: -56, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.45, delay: 0.15 }}
-        className="fixed left-0 top-[49px] bottom-0 z-40 w-[200px] hidden md:flex flex-col justify-between py-5"
-        style={{ background: 'rgba(7,8,15,0.9)', borderRight: '1px solid rgba(201,168,76,0.09)', backdropFilter: 'blur(16px)' }}
+        className="fixed left-0 top-[49px] bottom-0 z-40 hidden md:flex flex-col justify-between py-5"
+        style={{
+          width: desktopOpen ? '200px' : '0px',
+          overflow: desktopOpen ? 'visible' : 'hidden',
+          background: 'rgba(7,8,15,0.9)',
+          borderRight: '1px solid rgba(201,168,76,0.09)',
+          backdropFilter: 'blur(16px)',
+          transition: 'width 0.25s ease'
+        }}
       >
         <div>
-          <div className="px-5 mb-3">
+          <div className="px-5 mb-3 flex items-center justify-between">
             <p className="nav-label text-[0.5rem]" style={{ color: 'rgba(201,168,76,0.32)', letterSpacing: '0.45em' }}>NAVIGATION</p>
           </div>
           {navItems}
         </div>
         {bottomSection}
       </motion.aside>
+
+      {/* Desktop toggle button */}
+      <button
+        className="fixed z-50 hidden md:flex items-center justify-center w-6 h-6 rounded-sm"
+        style={{
+          top: '60px',
+          left: desktopOpen ? '188px' : '4px',
+          background: 'rgba(7,8,15,0.95)',
+          border: '1px solid rgba(201,168,76,0.25)',
+          transition: 'left 0.25s ease'
+        }}
+        onClick={() => setDesktopOpen(o => !o)}
+        aria-label={desktopOpen ? 'Close sidebar' : 'Open sidebar'}
+      >
+        {desktopOpen
+          ? <X size={12} style={{ color: 'rgba(201,168,76,0.7)' }} />
+          : <Menu size={12} style={{ color: 'rgba(201,168,76,0.7)' }} />}
+      </button>
     </>
   )
 }
