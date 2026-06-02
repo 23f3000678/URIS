@@ -447,21 +447,57 @@ async function getTaskFilter(user) {
 }
 
 async function generateFormReminders() {
-  const allInterns = await prisma.intern.findMany({
-    select: { id: true, user: { select: { name: true, email: true } } },
+  const configStore = require('./configStore');
+
+  // Roles that should fill the form: all interns, leads, Orenda members, OPM
+  const FORM_REMINDER_ROLES = [
+    'TECHNICAL_INTERN',
+    'OPERATIONS_INTERN',
+    'RESEARCH_INTERN',
+    'TECHNICAL_LEAD',
+    'OPERATIONS_LEAD',
+    'RESEARCH_LEAD',
+    'OPERATIONS_PROGRAM_MANAGER',
+    'OBSERVER_TEAM_LEAD',
+    'COLLABORATOR_LEAD',
+    'ORENDA_MEMBER',
+  ];
+
+  // Fetch the admin-configured form URL; skip sending if not yet set
+  const baseFormUrl = await configStore.get('formReminderUrl', '');
+  if (!baseFormUrl) {
+    logger.info('generateFormReminders: no form URL configured — skipping');
+    return 0;
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      status: 'active',
+      role:   { in: FORM_REMINDER_ROLES },
+    },
+    include: {
+      intern: { select: { id: true } },
+    },
   });
 
   let created = 0;
-  for (const intern of allInterns) {
-    const internName = intern.user?.name || intern.user?.email?.split('@')[0] || 'Intern';
-    const encodedName = encodeURIComponent(internName);
-    const encodedEmail = encodeURIComponent(intern.user?.email || '');
-    // In a real scenario, this would be a pre-filled Google Form link
-    const formLink = `https://forms.google.com/mock-form?name=${encodedName}&email=${encodedEmail}`;
-    
+  for (const user of users) {
+    // Build a personalised URL with name + email pre-fill params
+    const encodedName  = encodeURIComponent(user.name || user.email?.split('@')[0] || 'Member');
+    const encodedEmail = encodeURIComponent(user.email || '');
+    const separator = baseFormUrl.includes('?') ? '&' : '?';
+    const formLink = `${baseFormUrl}${separator}name=${encodedName}&email=${encodedEmail}`;
+
+    // Use the intern record id if available, otherwise fall back to the user id
+    const recipientInternId = user.intern?.id ?? null;
+
+    // Only create the alert if there's a linked intern record (for non-intern
+    // roles there won't be one — skip to avoid FK violations)
+    if (!recipientInternId) continue;
+
     await prisma.alert.create({
       data: {
-        internId: intern.id,
+        internId: recipientInternId,
         type:     'form_reminder',
         severity: 'info',
         message:  `Please fill out your 3-day update form (Tasks, Availability, and Report Attachment): ${formLink}`,

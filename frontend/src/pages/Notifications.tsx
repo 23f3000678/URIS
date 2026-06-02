@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bell, Check, Loader2, AlertTriangle,
-  ClipboardList, Pause, Flag, Star, Clock, ShieldAlert,
+  ClipboardList, Pause, Flag, Star, Clock, ShieldAlert, FileText, ExternalLink,
 } from 'lucide-react'
 import Sidebar   from '../components/Sidebar'
 import Starfield from '../components/Starfield'
@@ -22,6 +22,8 @@ const TYPE_META: Record<string, { label: string; color: string; Icon: React.Elem
   low_performance:       { label: 'PERFORMANCE',    color: '#f87171', Icon: AlertTriangle },
   spike:                 { label: 'SCORE SPIKE',    color: '#f59e0b', Icon: AlertTriangle },
   low_capacity:          { label: 'LOW CAPACITY',   color: '#f59e0b', Icon: AlertTriangle },
+  form_reminder:         { label: 'FORM REMINDER',  color: '#c9a84c', Icon: FileText      },
+  task_reminder:         { label: 'TASK REMINDER',  color: '#f59e0b', Icon: ClipboardList },
 }
 
 function getMeta(type: string) {
@@ -40,6 +42,33 @@ function timeAgo(iso: string): string {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24)  return `${hrs}h ago`
   return `${Math.floor(hrs / 24)}d ago`
+}
+
+// ── Form reminder — extract URL from message and render clickable link ────────
+
+function FormReminderMessage({ message }: { message: string }) {
+  const urlMatch = message.match(/https?:\/\/\S+/)
+  const url = urlMatch?.[0] ?? null
+  const text = url ? message.replace(url, '').replace(/:?\s*$/, '') : message
+  return (
+    <p className="font-body text-sm text-frost/80 leading-snug">
+      {text}
+      {url && (
+        <>
+          {': '}
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
+            style={{ color: '#c9a84c', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+          >
+            Open Form <ExternalLink size={11} className="inline-block" />
+          </a>
+        </>
+      )}
+    </p>
+  )
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -222,7 +251,11 @@ export default function Notifications() {
                                 {timeAgo(alert.createdAt)}
                               </span>
                             </div>
-                            <p className="font-body text-sm text-frost/80 leading-snug">{alert.message}</p>
+                            {alert.type === 'form_reminder' ? (
+                              <FormReminderMessage message={alert.message} />
+                            ) : (
+                              <p className="font-body text-sm text-frost/80 leading-snug">{alert.message}</p>
+                            )}
                           </div>
 
                           {/* Mark as read */}

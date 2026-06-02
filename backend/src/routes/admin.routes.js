@@ -8,6 +8,8 @@ const {
   approveUser,
   getAvailabilityDeadline,
   setAvailabilityDeadline,
+  getFormReminderUrl,
+  setFormReminderUrl,
   finishInternship,
   blockIP,
   unblockIP,
@@ -42,6 +44,8 @@ router.post('/approve-user',            verifyToken, requireRole(...ADMIN_ROLES)
 router.post('/reject-user',             verifyToken, requireRole(...ADMIN_ROLES),                                     rejectUser);
 router.get('/availability-deadline',    verifyToken,                                                                   getAvailabilityDeadline);
 router.post('/availability-deadline',   verifyToken, requireRole(...ADMIN_ROLES),                                     setAvailabilityDeadline);
+router.get('/form-reminder-url',        verifyToken,                                                                   getFormReminderUrl);
+router.post('/form-reminder-url',       verifyToken, requireRole(...ADMIN_ROLES),                                     setFormReminderUrl);
 router.post('/finish-internship',       verifyToken, requireRole(...ADMIN_ROLES),                                     finishInternship);
 router.delete('/interns/:internId',     verifyToken, requireRole(ROLES.CORE_ADMIN),                                   deleteIntern);
 router.patch('/interns/:internId',      verifyToken, requireRole(...ADMIN_ROLES),                                     updateIntern);

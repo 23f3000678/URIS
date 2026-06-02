@@ -393,6 +393,33 @@ async function setAvailabilityDeadline(req, res, next) {
   }
 }
 
+async function getFormReminderUrl(req, res, next) {
+  try {
+    const url = await configStore.get('formReminderUrl', '');
+    return ok(res, { url }, 'Form reminder URL fetched');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function setFormReminderUrl(req, res, next) {
+  try {
+    const { url } = req.body;
+    if (typeof url !== 'string') {
+      return validationError(res, 'url must be a string');
+    }
+    const trimmed = url.trim();
+    if (trimmed && !/^https?:\/\/.+/.test(trimmed)) {
+      return validationError(res, 'url must be a valid http/https URL');
+    }
+    await configStore.set('formReminderUrl', trimmed);
+    void logAction(req.user?.id ?? null, AUDIT_ACTIONS.SET_AVAILABILITY_DEADLINE, AUDIT_ENTITIES.CONFIG, null, { formReminderUrl: trimmed });
+    return ok(res, { url: trimmed }, 'Form reminder URL updated');
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function finishInternship(req, res, next) {
   try {
     const { internId } = req.body;
@@ -425,7 +452,7 @@ async function finishInternship(req, res, next) {
   }
 }
 
-module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers, deleteIntern, updateIntern, rejectUser };
+module.exports = { overrideScore, updateTaskStatus, getAdminOverview, getPendingUsers, approveUser, getAvailabilityDeadline, setAvailabilityDeadline, getFormReminderUrl, setFormReminderUrl, finishInternship, blockIP, unblockIP, listBlockedIPs, getLoginLogs, changeUserRole, getAllUsers, deleteIntern, updateIntern, rejectUser };
 
 // ── Get all users (for role management UI) ────────────────────────────────────
 
